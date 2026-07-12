@@ -10,13 +10,13 @@ import {
   ScrollView,
   Modal,
   useColorScheme,
+  Platform,
 } from 'react-native';
 import { customAlert } from '@/utils/alert';
-import { useRouter } from 'expo-router';
 import { useInventory, Car } from '@/context/InventoryContext';
+import { TopNavigation } from '@/components/top-navigation';
 
 export default function ProductsScreen() {
-  const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
@@ -95,15 +95,7 @@ export default function ProductsScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
       
       {/* Header */}
-      <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
-        <TouchableOpacity style={styles.menuButton}>
-          <Text style={[styles.menuIcon, { color: isDark ? '#fff' : '#333' }]}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Inventory</Text>
-        <TouchableOpacity style={styles.profileButton}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </TouchableOpacity>
-      </View>
+      {Platform.OS !== 'web' && <TopNavigation activeTab="products" />}
 
       {/* Search and Filter panel */}
       <View style={styles.searchAndActionContainer}>
@@ -157,7 +149,7 @@ export default function ProductsScreen() {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🚗💤</Text>
             <Text style={[styles.emptyText, { color: isDark ? '#8a8e94' : '#666' }]}>
-              No cars found matching "{searchQuery}"
+              No cars found matching &quot;{searchQuery}&quot;
             </Text>
           </View>
         ) : (

@@ -9,10 +9,12 @@ import {
   View,
   ScrollView,
   useColorScheme,
+  Platform,
 } from 'react-native';
 import { customAlert } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import { useInventory, Car } from '@/context/InventoryContext';
+import { TopNavigation } from '@/components/top-navigation';
 
 const VEHICLE_TYPES = ['Sedan', 'SUV', 'Sports', 'Electric', 'Coupe'] as const;
 
@@ -138,15 +140,7 @@ export default function AddScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
       
       {/* Header */}
-      <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
-        <View style={styles.menuButton}>
-          <Text style={{ fontSize: 16 }}>✏️</Text>
-        </View>
-        <Text style={styles.headerTitle}>Add Car Model</Text>
-        <View style={styles.profileButton}>
-          <Text style={styles.profileIcon}>{selectedEmoji}</Text>
-        </View>
-      </View>
+      {Platform.OS !== 'web' && <TopNavigation activeTab="add" rightIcon={selectedEmoji} />}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.formContainer, themeStyles.cardBg, themeStyles.border]}>

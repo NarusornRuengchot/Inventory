@@ -8,6 +8,7 @@ import {
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { Link, usePathname } from 'expo-router';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
@@ -18,9 +19,13 @@ import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 export default function AppTabs() {
   return (
     <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+      <View style={styles.slotContainer}>
+        <TabSlot style={{ height: '100%' }} />
+      </View>
+      
+      {/* Top Navigation Menu */}
       <TabList asChild>
-        <CustomTabList>
+        <CustomTabList position="top">
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
@@ -35,6 +40,9 @@ export default function AppTabs() {
           </TabTrigger>
         </CustomTabList>
       </TabList>
+
+      {/* Bottom Navigation Menu */}
+      <WebFooterNav />
     </Tabs>
   );
 }
@@ -53,42 +61,126 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   );
 }
 
-export function CustomTabList(props: TabListProps) {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+export function WebFooterNav() {
+  const pathname = usePathname();
+  
+  const getButtonType = (routePath: string) => {
+    // Exact match for nested or root paths
+    const isActive = pathname === routePath || (routePath !== '/' && pathname.startsWith(routePath));
+    return isActive ? 'backgroundSelected' : 'backgroundElement';
+  };
+
+  const getTextColor = (routePath: string) => {
+    const isActive = pathname === routePath || (routePath !== '/' && pathname.startsWith(routePath));
+    return isActive ? 'text' : 'textSecondary';
+  };
 
   return (
-    <View {...props} style={styles.tabListContainer}>
+    <View style={styles.tabListContainerBottom}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <ThemedText type="smallBold" style={styles.brandText}>
-          🚗 CarHub Portal
+          🚗 CarHub Footer
+        </ThemedText>
+
+        <Link href="/" asChild>
+          <Pressable style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type={getButtonType('/')} style={styles.tabButtonView}>
+              <ThemedText type="small" themeColor={getTextColor('/')}>Home</ThemedText>
+            </ThemedView>
+          </Pressable>
+        </Link>
+
+        <Link href="/products" asChild>
+          <Pressable style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type={getButtonType('/products')} style={styles.tabButtonView}>
+              <ThemedText type="small" themeColor={getTextColor('/products')}>Products</ThemedText>
+            </ThemedView>
+          </Pressable>
+        </Link>
+
+        <Link href="/add" asChild>
+          <Pressable style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type={getButtonType('/add')} style={styles.tabButtonView}>
+              <ThemedText type="small" themeColor={getTextColor('/add')}>Add</ThemedText>
+            </ThemedView>
+          </Pressable>
+        </Link>
+
+        <Link href="/categories" asChild>
+          <Pressable style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type={getButtonType('/categories')} style={styles.tabButtonView}>
+              <ThemedText type="small" themeColor={getTextColor('/categories')}>Categories</ThemedText>
+            </ThemedView>
+          </Pressable>
+        </Link>
+      </ThemedView>
+    </View>
+  );
+}
+
+interface CustomTabListProps extends TabListProps {
+  position?: 'top' | 'bottom';
+}
+
+export function CustomTabList({ position = 'top', ...props }: CustomTabListProps) {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  
+  const containerStyle = position === 'bottom' ? styles.tabListContainerBottom : styles.tabListContainerTop;
+
+  return (
+    <View {...props} style={containerStyle}>
+      <ThemedView type="backgroundElement" style={styles.innerContainer}>
+        <ThemedText type="smallBold" style={styles.brandText}>
+          🚗 CarHub {position === 'bottom' ? 'Footer' : 'Portal'}
         </ThemedText>
 
         {props.children}
 
-        <ExternalLink href="https://docs.expo.dev" asChild>
-          <Pressable style={styles.externalPressable}>
-            <ThemedText type="link">Docs</ThemedText>
-            <SymbolView
-              tintColor={colors.text}
-              name={{ ios: 'arrow.up.right.square', web: 'link' }}
-              size={12}
-            />
-          </Pressable>
-        </ExternalLink>
+        {position === 'top' && (
+          <ExternalLink href="https://docs.expo.dev" asChild>
+            <Pressable style={styles.externalPressable}>
+              <ThemedText type="link">Docs</ThemedText>
+              <SymbolView
+                tintColor={colors.text}
+                name={{ ios: 'arrow.up.right.square', web: 'link' }}
+                size={12}
+              />
+            </Pressable>
+          </ExternalLink>
+        )}
       </ThemedView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabListContainer: {
-    position: 'absolute',
-    width: '100%',
+  slotContainer: {
+    flex: 1,
+    paddingTop: 80,
+    paddingBottom: 80,
+  },
+  tabListContainerTop: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
     padding: Spacing.three,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    zIndex: 1000,
+  },
+  tabListContainerBottom: {
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: Spacing.three,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    zIndex: 1000,
   },
   innerContainer: {
     paddingVertical: Spacing.two,

@@ -7,8 +7,10 @@ import {
   View,
   ScrollView,
   useColorScheme,
+  Platform,
 } from 'react-native';
 import { useInventory } from '@/context/InventoryContext';
+import { TopNavigation } from '@/components/top-navigation';
 
 export default function CategoriesScreen() {
   const colorScheme = useColorScheme();
@@ -59,15 +61,7 @@ export default function CategoriesScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
       
       {/* Header */}
-      <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
-        <View style={styles.menuButton}>
-          <Text style={{ fontSize: 16 }}>📊</Text>
-        </View>
-        <Text style={styles.headerTitle}>Categories</Text>
-        <View style={styles.profileButton}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </View>
-      </View>
+      {Platform.OS !== 'web' && <TopNavigation activeTab="categories" />}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Section: By Brand */}

@@ -8,9 +8,11 @@ import {
   ScrollView,
   TouchableOpacity,
   useColorScheme,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useInventory } from '@/context/InventoryContext';
+import { TopNavigation } from '@/components/top-navigation';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -39,15 +41,7 @@ export default function HomeScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
       
       {/* Header */}
-      <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
-        <View style={styles.menuButton}>
-          <Text style={{ fontSize: 16 }}>📊</Text>
-        </View>
-        <Text style={styles.headerTitle}>CarHub Portal</Text>
-        <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/products')}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </TouchableOpacity>
-      </View>
+      {Platform.OS !== 'web' && <TopNavigation activeTab="home" />}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
@@ -138,7 +132,7 @@ export default function HomeScreen() {
           <View style={[styles.emptySalesCard, themeStyles.cardBg, themeStyles.border]}>
             <Text style={{ fontSize: 24, marginBottom: 8 }}>📊</Text>
             <Text style={{ color: themeStyles.textSecondary, textAlign: 'center' }}>
-              No sales recorded yet. Click "Sell" on any available car in products listing!
+              No sales recorded yet. Click &quot;Sell&quot; on any available car in products listing!
             </Text>
           </View>
         ) : (
