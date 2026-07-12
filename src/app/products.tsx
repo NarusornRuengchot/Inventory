@@ -1,31 +1,31 @@
-import React, { useState } from 'react';
+import { TopNavigation } from '@/components/top-navigation';
+import { Car, useInventory } from '@/context/InventoryContext';
+import { customAlert } from '@/utils/alert';
+import { useState } from 'react';
 import {
+  Modal,
+  Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ScrollView,
-  Modal,
   useColorScheme,
-  Platform,
+  View,
 } from 'react-native';
-import { customAlert } from '@/utils/alert';
-import { useInventory, Car } from '@/context/InventoryContext';
-import { TopNavigation } from '@/components/top-navigation';
 
 export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
   const { cars, sellCar, deleteCar } = useInventory();
-  
+
   // State for search and filter
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Available' | 'Sold'>('All');
-  
+
   // State for Sell Modal
   const [sellModalVisible, setSellModalVisible] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
@@ -38,10 +38,10 @@ export default function ProductsScreen() {
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       car.type.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     const matchesStatus =
       statusFilter === 'All' ? true : car.status === statusFilter;
-      
+
     return matchesSearch && matchesStatus;
   });
 
@@ -93,7 +93,7 @@ export default function ProductsScreen() {
   return (
     <SafeAreaView style={[styles.container, themeStyles.container]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
-      
+
       {/* Header */}
       {Platform.OS !== 'web' && <TopNavigation activeTab="products" />}
 
@@ -115,7 +115,7 @@ export default function ProductsScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        
+
         <View style={styles.actionRow}>
           {/* Quick Filters */}
           <View style={styles.filterChips}>
@@ -265,7 +265,7 @@ export default function ProductsScreen() {
             <View style={styles.modalInputGroup}>
               <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Final Selling Price ($)</Text>
               <TextInput
-                style={[styles.modalInput, { 
+                style={[styles.modalInput, {
                   borderColor: isDark ? '#2E3135' : '#ddd',
                   color: isDark ? '#fff' : '#000',
                   backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
