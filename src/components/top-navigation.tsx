@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, useColorScheme, Platform } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useThemeMode } from '@/context/ThemeContext';
 
 interface TopNavigationProps {
   activeTab: 'home' | 'products' | 'add' | 'categories';
@@ -9,7 +10,7 @@ interface TopNavigationProps {
 
 export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const { colorScheme, setThemeMode } = useThemeMode();
   const isDark = colorScheme === 'dark';
 
   // Do not render on Web to avoid duplicating top navigation
@@ -27,9 +28,17 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
     <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
       <View style={styles.topRow}>
         <Text style={styles.headerTitle}>🚗 CarHub Portal</Text>
-        <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/products')}>
-          <Text style={styles.profileIcon}>{rightIcon}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <TouchableOpacity 
+            style={[styles.profileButton, { backgroundColor: isDark ? '#2E3135' : '#E0E1E6' }]} 
+            onPress={() => setThemeMode(colorScheme === 'dark' ? 'light' : 'dark')}
+          >
+            <Text style={styles.profileIcon}>{colorScheme === 'dark' ? '☀️' : '🌙'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/products')}>
+            <Text style={styles.profileIcon}>{rightIcon}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       <View style={styles.navRow}>
