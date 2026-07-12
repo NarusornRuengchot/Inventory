@@ -7,7 +7,7 @@ import {
   TabTriggerSlotProps,
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, useColorScheme, View, useWindowDimensions } from 'react-native';
 import { Link, usePathname } from 'expo-router';
 
 import { ExternalLink } from './external-link';
@@ -15,11 +15,14 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
+  const theme = useTheme();
+
   return (
-    <Tabs>
-      <View style={styles.slotContainer}>
+    <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={[styles.slotContainer, { backgroundColor: theme.background }]}>
         <TabSlot style={{ height: '100%' }} />
       </View>
       
@@ -63,9 +66,10 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 
 export function WebFooterNav() {
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 600;
   
   const getButtonType = (routePath: string) => {
-    // Exact match for nested or root paths
     const isActive = pathname === routePath || (routePath !== '/' && pathname.startsWith(routePath));
     return isActive ? 'backgroundSelected' : 'backgroundElement';
   };
@@ -77,10 +81,18 @@ export function WebFooterNav() {
 
   return (
     <View style={styles.tabListContainerBottom}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          🚗 CarHub Footer
-        </ThemedText>
+      <ThemedView 
+        type="backgroundElement" 
+        style={[
+          styles.innerContainer, 
+          isNarrow && { justifyContent: 'center', flexGrow: 0 }
+        ]}
+      >
+        {!isNarrow && (
+          <ThemedText type="smallBold" style={styles.brandText}>
+            🚗 CarHub Footer
+          </ThemedText>
+        )}
 
         <Link href="/" asChild>
           <Pressable style={({ pressed }) => pressed && styles.pressed}>
@@ -125,19 +137,29 @@ interface CustomTabListProps extends TabListProps {
 export function CustomTabList({ position = 'top', ...props }: CustomTabListProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 600;
   
   const containerStyle = position === 'bottom' ? styles.tabListContainerBottom : styles.tabListContainerTop;
 
   return (
     <View {...props} style={containerStyle}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          🚗 CarHub {position === 'bottom' ? 'Footer' : 'Portal'}
-        </ThemedText>
+      <ThemedView 
+        type="backgroundElement" 
+        style={[
+          styles.innerContainer, 
+          isNarrow && { justifyContent: 'center', flexGrow: 0 }
+        ]}
+      >
+        {!isNarrow && (
+          <ThemedText type="smallBold" style={styles.brandText}>
+            🚗 CarHub {position === 'bottom' ? 'Footer' : 'Portal'}
+          </ThemedText>
+        )}
 
         {props.children}
 
-        {position === 'top' && (
+        {position === 'top' && !isNarrow && (
           <ExternalLink href="https://docs.expo.dev" asChild>
             <Pressable style={styles.externalPressable}>
               <ThemedText type="link">Docs</ThemedText>
