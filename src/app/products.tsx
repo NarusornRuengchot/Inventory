@@ -2,12 +2,13 @@ import { Car, useInventory } from '@/context/InventoryContext';
 import { customAlert } from '@/utils/alert';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,7 +19,6 @@ import {
 } from 'react-native';
 
 // Import local JSON fallback
-import localProducts from '../../products.json';
 
 // Raw GitHub URL as requested in Slide 11
 // Replace USERNAME/REPOSITORY with the actual GitHub details when pushing
@@ -68,8 +68,7 @@ export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { cars, setCars, sellCar, deleteCar } = useInventory();
-  const [loading, setLoading] = useState(true);
+  const { cars, setCars, sellCar, deleteCar, updateCar, loading } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Low in stock'>('All');
 
@@ -78,66 +77,14 @@ export default function ProductsScreen() {
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [sellPriceInput, setSellPriceInput] = useState('');
 
-  // Fetch product data from GitHub with local fallback and sync with context
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const response = await fetch(PRODUCTS_URL);
-        let fetchedData: Car[] = [];
-        if (response.ok) {
-          fetchedData = await response.json();
-        } else {
-          fetchedData = localProducts as Car[];
-        }
-
-        // Merge fetched cars into Context state to maintain consistency and keep user adjustments
-        setCars((currentCars) => {
-          const merged = [...currentCars];
-          fetchedData.forEach((fetchedCar) => {
-            const index = merged.findIndex((c) => c.id === fetchedCar.id);
-            if (index > -1) {
-              // Retain user local edits like 'status', 'sellPrice', 'sellDate' and preserve original properties
-              merged[index] = {
-                ...merged[index],
-                ...fetchedCar,
-                status: merged[index].status,
-                sellPrice: merged[index].sellPrice,
-                sellDate: merged[index].sellDate,
-              };
-            } else {
-              merged.push(fetchedCar);
-            }
-          });
-          return merged;
-        });
-      } catch (error) {
-        console.warn('Could not fetch products from GitHub, using local fallback:', error);
-        // Fallback merge
-        setCars((currentCars) => {
-          const merged = [...currentCars];
-          (localProducts as Car[]).forEach((fetchedCar) => {
-            const index = merged.findIndex((c) => c.id === fetchedCar.id);
-            if (index > -1) {
-              merged[index] = {
-                ...merged[index],
-                ...fetchedCar,
-                status: merged[index].status,
-                sellPrice: merged[index].sellPrice,
-                sellDate: merged[index].sellDate,
-              };
-            } else {
-              merged.push(fetchedCar);
-            }
-          });
-          return merged;
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadProducts();
-  }, []);
+  // State for Edit Modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editStock, setEditStock] = useState('');
+  const [editLocationText, setEditLocationText] = useState('');
 
   // Map all context cars to product schema
   const products = cars.map(deriveProductFromCar);
@@ -160,6 +107,7 @@ export default function ProductsScreen() {
         `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nPrice: $${(car.price ?? 0).toLocaleString()}\nStatus: ${car.status}`,
         [
           { text: 'Cancel', style: 'cancel' },
+          { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
           { text: 'Sell 💰', onPress: () => handleOpenSellModal(car) },
           { text: 'Delete 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
         ]
@@ -170,10 +118,55 @@ export default function ProductsScreen() {
         `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nSold Price: $${(car.sellPrice ?? car.price ?? 0).toLocaleString()}\nSold Date: ${car.sellDate ?? 'N/A'}`,
         [
           { text: 'Cancel', style: 'cancel' },
+          { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
           { text: 'Delete History 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
         ]
       );
     }
+  };
+
+  const handleOpenEditModal = (car: Car) => {
+    setEditingCar(car);
+    const product = deriveProductFromCar(car);
+    setEditName(product.name);
+    setEditPrice((car.price ?? 0).toString());
+    setEditCategory(product.category);
+    setEditStock((product.stock).toString());
+    setEditLocationText(product.location_text);
+    setEditModalVisible(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (!editingCar) return;
+    const priceVal = parseFloat(editPrice);
+    const stockVal = parseInt(editStock);
+
+    if (!editName.trim() || !editCategory.trim() || isNaN(priceVal) || priceVal < 0 || isNaN(stockVal) || stockVal < 0) {
+      customAlert('Invalid Input', 'Please fill in all fields with valid values.');
+      return;
+    }
+
+    const nameParts = editName.trim().split(' ');
+    const makeVal = nameParts[0] || 'Unknown';
+    const modelVal = nameParts.slice(1).join(' ').replace(/\s*\(\d{4}\)$/, '') || 'Model';
+
+    updateCar(editingCar.id, {
+      name: editName.trim(),
+      make: makeVal,
+      model: modelVal,
+      price: priceVal,
+      category: editCategory.trim(),
+      type: (editCategory.trim() as any),
+      stock: stockVal,
+      stock_text: `${stockVal} in stock`,
+      location_count: stockVal > 0 ? 2 : 0,
+      location_text: editLocationText.trim(),
+      badge_status: stockVal > 0 ? 'Active' : 'Low in stock',
+    });
+
+    setEditModalVisible(false);
+    setEditingCar(null);
+    customAlert('Success', 'Product updated successfully.');
   };
 
   const handleOpenSellModal = (car: Car) => {
@@ -415,6 +408,114 @@ export default function ProductsScreen() {
                 onPress={handleConfirmSell}
               >
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Confirm Sale</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Editing Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={editModalVisible}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#212225' : '#ffffff' }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Edit Product</Text>
+
+            <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Product Name</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  }]}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Product name"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Price ($)</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  }]}
+                  keyboardType="numeric"
+                  value={editPrice}
+                  onChangeText={setEditPrice}
+                  placeholder="Price"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Category</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  }]}
+                  value={editCategory}
+                  onChangeText={setEditCategory}
+                  placeholder="Category (e.g. Electric, Sports, SUV)"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Stock</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  }]}
+                  keyboardType="numeric"
+                  value={editStock}
+                  onChangeText={setEditStock}
+                  placeholder="Stock quantity"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Location</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  }]}
+                  value={editLocationText}
+                  onChangeText={setEditLocationText}
+                  placeholder="Location (e.g. 2 showrooms)"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: isDark ? '#2e3135' : '#f0f0f0' }]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={[styles.modalBtnText, { color: isDark ? '#fff' : '#333' }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                onPress={handleConfirmEdit}
+              >
+                <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>

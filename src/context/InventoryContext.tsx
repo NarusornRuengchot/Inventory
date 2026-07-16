@@ -37,15 +37,17 @@ export interface Sale {
 interface InventoryContextType {
   cars: Car[];
   sales: Sale[];
+  loading: boolean;
   addCar: (car: Omit<Car, 'id' | 'status'>) => void;
   sellCar: (carId: string, sellPrice: number) => void;
   deleteCar: (carId: string) => void;
+  updateCar: (carId: string, updatedFields: Partial<Car>) => void;
   setCars: React.Dispatch<React.SetStateAction<Car[]>>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const initialCars: Car[] = [
+export const initialCars: Car[] = [
   {
     id: '1',
     make: 'Tesla',
@@ -190,6 +192,7 @@ const initialSales: Sale[] = [
 ];
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true);
   // Load initial state with localStorage support for web
   const [cars, setCars] = useState<Car[]>(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
@@ -232,6 +235,76 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
   }, [sales]);
 
+  // Fetch from GitHub raw URL on mount to load/sync and auto-heal missing fields
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json');
+        let fetchedData: Car[] = [];
+        if (response.ok) {
+          fetchedData = await response.json();
+        } else {
+          try {
+            const localProducts = require('../../products.json');
+            fetchedData = localProducts as Car[];
+          } catch {
+            fetchedData = initialCars;
+          }
+        }
+
+        setCars((currentCars) => {
+          const merged = [...currentCars];
+          fetchedData.forEach((fetchedCar) => {
+            const index = merged.findIndex((c) => c.id === fetchedCar.id);
+            const fallbackCar = initialCars.find((c) => c.id === fetchedCar.id);
+            const defaultFields = fallbackCar || {
+              make: fetchedCar.name ? fetchedCar.name.split(' ')[0] : 'Unknown',
+              model: fetchedCar.name ? fetchedCar.name.replace(/^[^\s]+\s+/, '').replace(/\s*\(\d{4}\)$/, '') : 'Unknown',
+              year: fetchedCar.name ? parseInt(fetchedCar.name.match(/\((\d{4})\)/)?.[1] || '2023') : 2023,
+              price: fetchedCar.category === 'Electric' ? 89990 : fetchedCar.category === 'Sports' ? 74500 : 45990,
+              type: (fetchedCar.category as any) || 'Sedan',
+              mileage: 10000,
+              engine: 'Turbo I4',
+              imageEmoji: fetchedCar.category === 'Electric' ? '⚡' : fetchedCar.category === 'Sports' ? '🏎️' : '🚗',
+            };
+
+            if (index > -1) {
+              merged[index] = {
+                ...defaultFields,
+                ...merged[index],
+                ...fetchedCar,
+                make: merged[index].make || defaultFields.make,
+                model: merged[index].model || defaultFields.model,
+                year: merged[index].year || defaultFields.year,
+                price: merged[index].price || defaultFields.price,
+                type: merged[index].type || defaultFields.type,
+                mileage: merged[index].mileage || defaultFields.mileage,
+                engine: merged[index].engine || defaultFields.engine,
+                imageEmoji: merged[index].imageEmoji || defaultFields.imageEmoji,
+                status: merged[index].status || 'Available',
+                sellPrice: merged[index].sellPrice,
+                sellDate: merged[index].sellDate,
+              };
+            } else {
+              merged.push({
+                ...defaultFields,
+                ...fetchedCar,
+                status: 'Available',
+              });
+            }
+          });
+          return merged;
+        });
+      } catch (error) {
+        console.warn('Could not fetch products on init:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProducts();
+  }, []);
+
   const addCar = (newCar: Omit<Car, 'id' | 'status'>) => {
     const car: Car = {
       ...newCar,
@@ -268,8 +341,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setSales((prev) => prev.filter((s) => s.carId !== carId));
   };
 
+  const updateCar = (carId: string, updatedFields: Partial<Car>) => {
+    setCars((prev) =>
+      prev.map((c) => (c.id === carId ? { ...c, ...updatedFields } : c))
+    );
+  };
+
   return (
-    <InventoryContext.Provider value={{ cars, sales, addCar, sellCar, deleteCar, setCars }}>
+    <InventoryContext.Provider value={{ cars, sales, loading, addCar, sellCar, deleteCar, updateCar, setCars }}>
       {children}
     </InventoryContext.Provider>
   );
