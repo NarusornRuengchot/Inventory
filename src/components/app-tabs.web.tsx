@@ -33,11 +33,11 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="products" href="/products" asChild>
-            <TabButton>Products</TabButton>
-          </TabTrigger>
           <TabTrigger name="add" href="/add" asChild>
             <TabButton>Add</TabButton>
+          </TabTrigger>
+          <TabTrigger name="products" href="/products" asChild>
+            <TabButton>Products</TabButton>
           </TabTrigger>
           <TabTrigger name="categories" href="/categories" asChild>
             <TabButton>Categories</TabButton>
@@ -104,18 +104,18 @@ export function WebFooterNav() {
           </Pressable>
         </Link>
 
-        <Link href="/products" asChild>
-          <Pressable style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView type={getButtonType('/products')} style={styles.tabButtonView}>
-              <ThemedText type="small" themeColor={getTextColor('/products')}>Products</ThemedText>
-            </ThemedView>
-          </Pressable>
-        </Link>
-
         <Link href="/add" asChild>
           <Pressable style={({ pressed }) => pressed && styles.pressed}>
             <ThemedView type={getButtonType('/add')} style={styles.tabButtonView}>
               <ThemedText type="small" themeColor={getTextColor('/add')}>Add</ThemedText>
+            </ThemedView>
+          </Pressable>
+        </Link>
+
+        <Link href="/products" asChild>
+          <Pressable style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type={getButtonType('/products')} style={styles.tabButtonView}>
+              <ThemedText type="small" themeColor={getTextColor('/products')}>Products</ThemedText>
             </ThemedView>
           </Pressable>
         </Link>

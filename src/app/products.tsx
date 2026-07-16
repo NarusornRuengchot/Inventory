@@ -1,29 +1,28 @@
+import { Car, useInventory } from '@/context/InventoryContext';
+import { customAlert } from '@/utils/alert';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
-  Platform,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   useColorScheme,
-  View,
+  View
 } from 'react-native';
-import { customAlert } from '@/utils/alert';
-import { useInventory, Car } from '@/context/InventoryContext';
 
 // Import local JSON fallback
 import localProducts from '../../products.json';
 
 // Raw GitHub URL as requested in Slide 11
 // Replace USERNAME/REPOSITORY with the actual GitHub details when pushing
-const PRODUCTS_URL = 'https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/products.json';
+const PRODUCTS_URL = 'https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json';
 
 interface Product {
   id: string;
@@ -244,7 +243,7 @@ export default function ProductsScreen() {
         <TouchableOpacity style={styles.headerButton}>
           <Text style={[styles.headerIcon, { color: theme.text.color }]}>☰</Text>
         </TouchableOpacity>
-        
+
         <Text style={[styles.headerTitle, { color: theme.text.color }]}>Car Inventory</Text>
 
         <TouchableOpacity style={styles.profileButton}>
@@ -274,16 +273,16 @@ export default function ProductsScreen() {
           <Text style={styles.addProductText}>+ Add Product</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.filterButton, 
+            styles.filterButton,
             statusFilter !== 'All' && styles.filterButtonActive,
             { backgroundColor: statusFilter !== 'All' ? '#8B5CF6' : theme.inputBg }
-          ]} 
+          ]}
           onPress={toggleFilter}
         >
           <Text style={[
-            styles.filterButtonText, 
+            styles.filterButtonText,
             { color: statusFilter !== 'All' ? '#FFFFFF' : theme.text.color }
           ]}>
             Filter{statusFilter !== 'All' ? `: ${statusFilter}` : ''} ▽
@@ -301,13 +300,15 @@ export default function ProductsScreen() {
           <Text style={[styles.emptyText, theme.textSecondary]}>No products found 📦</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {filteredProducts.map((product) => {
+        <FlatList
+          data={filteredProducts}
+          keyExtractor={(product) => product.id}
+          contentContainerStyle={styles.scrollContent}
+          renderItem={({ item: product }) => {
             const isActive = product.badge_status === 'Active';
-            
+
             return (
               <TouchableOpacity
-                key={product.id}
                 style={[styles.productCard, theme.cardBg, theme.border]}
                 onPress={() => handleProductPress(product)}
                 activeOpacity={0.8}
@@ -355,7 +356,7 @@ export default function ProductsScreen() {
                       </Text>
                     </View>
 
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.arrowButton}
                       onPress={() => handleProductPress(product)}
                     >
@@ -365,8 +366,8 @@ export default function ProductsScreen() {
                 </View>
               </TouchableOpacity>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       )}
 
       {/* Selling Modal */}
