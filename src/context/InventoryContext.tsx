@@ -34,6 +34,8 @@ export interface Sale {
   sellDate: string;
 }
 
+const PRODUCTS_URL = 'https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json';
+
 interface InventoryContextType {
   cars: Car[];
   sales: Sale[];
@@ -239,7 +241,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadProducts() {
       try {
-        const response = await fetch('https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json');
+        const response = await fetch(PRODUCTS_URL);
         let fetchedData: Car[] = [];
         if (response.ok) {
           fetchedData = await response.json();
