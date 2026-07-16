@@ -33,17 +33,18 @@ export default function CategoriesScreen() {
     return acc;
   }, {} as Record<string, { count: number; totalValue: number; available: number; sold: number; emoji: string }>);
 
-  // Group by Vehicle Type
+  // Group by Vehicle Category
   const typeStats = cars.reduce((acc, car) => {
-    if (!acc[car.type]) {
-      acc[car.type] = { count: 0, totalValue: 0, available: 0, sold: 0 };
+    const category = car.category || car.type;
+    if (!acc[category]) {
+      acc[category] = { count: 0, totalValue: 0, available: 0, sold: 0 };
     }
-    acc[car.type].count += 1;
-    acc[car.type].totalValue += car.price;
+    acc[category].count += 1;
+    acc[category].totalValue += car.price;
     if (car.status === 'Available') {
-      acc[car.type].available += 1;
+      acc[category].available += 1;
     } else {
-      acc[car.type].sold += 1;
+      acc[category].sold += 1;
     }
     return acc;
   }, {} as Record<string, { count: number; totalValue: number; available: number; sold: number }>);
@@ -100,8 +101,8 @@ export default function CategoriesScreen() {
           ))}
         </View>
 
-        {/* Section: By Vehicle Type */}
-        <Text style={[styles.sectionTitle, { color: themeStyles.text, marginTop: 24 }]}>Vehicle Types</Text>
+        {/* Section: Categories */}
+        <Text style={[styles.sectionTitle, { color: themeStyles.text, marginTop: 24 }]}>Categories</Text>
         
         <View style={styles.typeList}>
           {Object.entries(typeStats).map(([type, stat]) => {

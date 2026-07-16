@@ -1,8 +1,8 @@
-import { TopNavigation } from '@/components/top-navigation';
-import { Car, useInventory } from '@/context/InventoryContext';
-import { customAlert } from '@/utils/alert';
-import { useState } from 'react';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   SafeAreaView,
@@ -15,39 +15,171 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import { customAlert } from '@/utils/alert';
+import { useInventory, Car } from '@/context/InventoryContext';
+
+// Import local JSON fallback
+import localProducts from '../../products.json';
+
+// Raw GitHub URL as requested in Slide 11
+// Replace USERNAME/REPOSITORY with the actual GitHub details when pushing
+const PRODUCTS_URL = 'https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/products.json';
+
+interface Product {
+  id: string;
+  name: string;
+  stock: number;
+  stock_text: string;
+  category: string;
+  location_count: number;
+  location_text: string;
+  badge_status: string;
+  image_url: string;
+  originalCar: Car; // reference back to inventory context object
+}
+
+function getImageUrlForEmoji(emoji: string): string {
+  if (emoji === '⚡') return 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=400&q=80';
+  if (emoji === '🏁') return 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=400&q=80';
+  if (emoji === '🏎️') return 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=400&q=80';
+  if (emoji === '🔋') return 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&w=400&q=80';
+  if (emoji === '⛰️') return 'https://images.unsplash.com/photo-1609521263047-f8f205293f24?auto=format&fit=crop&w=400&q=80';
+  if (emoji === '🇯🇵') return 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=400&q=80';
+  return 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80';
+}
+
+function deriveProductFromCar(car: Car): Product {
+  const isAvailable = car.status === 'Available';
+  return {
+    id: car.id,
+    name: car.name || `${car.make} ${car.model} (${car.year})`,
+    stock: car.stock !== undefined ? car.stock : (isAvailable ? 1 : 0),
+    stock_text: car.stock_text || (isAvailable ? '1 in stock' : 'Out of stock'),
+    category: car.category || car.type,
+    location_count: car.location_count !== undefined ? car.location_count : (isAvailable ? 1 : 0),
+    location_text: car.location_text || (isAvailable ? '1 showroom' : '0 showrooms'),
+    badge_status: car.status === 'Sold' ? 'Low in stock' : (car.badge_status || 'Active'),
+    image_url: car.image_url || getImageUrlForEmoji(car.imageEmoji),
+    originalCar: car,
+  };
+}
 
 export default function ProductsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { cars, sellCar, deleteCar } = useInventory();
-
-  // State for search and filter
+  const { cars, setCars, sellCar, deleteCar } = useInventory();
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Available' | 'Sold'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Low in stock'>('All');
 
   // State for Sell Modal
   const [sellModalVisible, setSellModalVisible] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [sellPriceInput, setSellPriceInput] = useState('');
 
-  // Filter cars based on search query and status filter
-  const filteredCars = cars.filter((car) => {
-    const matchesSearch =
-      `${car.make} ${car.model} ${car.year}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      car.type.toLowerCase().includes(searchQuery.toLowerCase());
+  // Fetch product data from GitHub with local fallback and sync with context
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const response = await fetch(PRODUCTS_URL);
+        let fetchedData: Car[] = [];
+        if (response.ok) {
+          fetchedData = await response.json();
+        } else {
+          fetchedData = localProducts as Car[];
+        }
 
-    const matchesStatus =
-      statusFilter === 'All' ? true : car.status === statusFilter;
+        // Merge fetched cars into Context state to maintain consistency and keep user adjustments
+        setCars((currentCars) => {
+          const merged = [...currentCars];
+          fetchedData.forEach((fetchedCar) => {
+            const index = merged.findIndex((c) => c.id === fetchedCar.id);
+            if (index > -1) {
+              // Retain user local edits like 'status', 'sellPrice', 'sellDate' and preserve original properties
+              merged[index] = {
+                ...merged[index],
+                ...fetchedCar,
+                status: merged[index].status,
+                sellPrice: merged[index].sellPrice,
+                sellDate: merged[index].sellDate,
+              };
+            } else {
+              merged.push(fetchedCar);
+            }
+          });
+          return merged;
+        });
+      } catch (error) {
+        console.warn('Could not fetch products from GitHub, using local fallback:', error);
+        // Fallback merge
+        setCars((currentCars) => {
+          const merged = [...currentCars];
+          (localProducts as Car[]).forEach((fetchedCar) => {
+            const index = merged.findIndex((c) => c.id === fetchedCar.id);
+            if (index > -1) {
+              merged[index] = {
+                ...merged[index],
+                ...fetchedCar,
+                status: merged[index].status,
+                sellPrice: merged[index].sellPrice,
+                sellDate: merged[index].sellDate,
+              };
+            } else {
+              merged.push(fetchedCar);
+            }
+          });
+          return merged;
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProducts();
+  }, []);
+
+  // Map all context cars to product schema
+  const products = cars.map(deriveProductFromCar);
+
+  // Filter products based on search query and status filter
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === 'All' ? true : product.badge_status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
+  const handleProductPress = (product: Product) => {
+    const car = product.originalCar;
+    if (car.status === 'Available') {
+      customAlert(
+        product.name,
+        `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nPrice: $${(car.price ?? 0).toLocaleString()}\nStatus: ${car.status}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sell 💰', onPress: () => handleOpenSellModal(car) },
+          { text: 'Delete 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
+        ]
+      );
+    } else {
+      customAlert(
+        product.name,
+        `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nSold Price: $${(car.sellPrice ?? car.price ?? 0).toLocaleString()}\nSold Date: ${car.sellDate ?? 'N/A'}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete History 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
+        ]
+      );
+    }
+  };
+
   const handleOpenSellModal = (car: Car) => {
     setSelectedCar(car);
-    setSellPriceInput(car.price.toString()); // default to asking price
+    setSellPriceInput(car.price.toString());
     setSellModalVisible(true);
   };
 
@@ -80,171 +212,162 @@ export default function ProductsScreen() {
     );
   };
 
-  // Theme-aware styles
-  const themeStyles = {
+  const handleAddProduct = () => {
+    router.push('/add');
+  };
+
+  const toggleFilter = () => {
+    // Cycles filter status
+    if (statusFilter === 'All') setStatusFilter('Active');
+    else if (statusFilter === 'Active') setStatusFilter('Low in stock');
+    else setStatusFilter('All');
+  };
+
+  // Theme colors
+  const theme = {
     container: isDark ? styles.darkContainer : styles.lightContainer,
-    text: isDark ? styles.darkText : styles.lightText,
     cardBg: isDark ? styles.darkCard : styles.lightCard,
     border: isDark ? styles.darkBorder : styles.lightBorder,
-    inputBg: isDark ? '#2E3135' : '#f0f0f3',
-    inputText: isDark ? '#ffffff' : '#000000',
+    text: isDark ? styles.darkText : styles.lightText,
+    textSecondary: isDark ? styles.darkTextSecondary : styles.lightTextSecondary,
+    inputBg: isDark ? '#2A2C30' : '#F0F0F3',
+    inputText: isDark ? '#FFFFFF' : '#000000',
+    headerBg: isDark ? '#161719' : '#FFFFFF',
   };
 
   return (
-    <SafeAreaView style={[styles.container, themeStyles.container]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
+    <SafeAreaView style={[styles.container, theme.container]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
 
-      {/* Header */}
-      {Platform.OS !== 'web' && <TopNavigation activeTab="products" />}
+      {/* Slide 3: Header Component */}
+      <View style={[styles.header, theme.border, { backgroundColor: theme.headerBg }]}>
+        <TouchableOpacity style={styles.headerButton}>
+          <Text style={[styles.headerIcon, { color: theme.text.color }]}>☰</Text>
+        </TouchableOpacity>
+        
+        <Text style={[styles.headerTitle, { color: theme.text.color }]}>Car Inventory</Text>
 
-      {/* Search and Filter panel */}
-      <View style={styles.searchAndActionContainer}>
-        <View style={[styles.searchBar, { backgroundColor: themeStyles.inputBg }]}>
+        <TouchableOpacity style={styles.profileButton}>
+          <Text style={styles.profileIcon}>👤</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Slide 3: Action Bar */}
+      <View style={styles.actionBarContainer}>
+        <View style={[styles.searchBar, { backgroundColor: theme.inputBg }]}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={[styles.searchInput, { color: themeStyles.inputText }]}
-            placeholder="Search make, model, year..."
-            placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+            style={[styles.searchInput, { color: theme.inputText }]}
+            placeholder="Search cars..."
+            placeholderTextColor={isDark ? '#8A8E94' : '#999999'}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            editable={true}
           />
           {searchQuery ? (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearch}>
-              <Text style={{ color: isDark ? '#8a8e94' : '#999', fontWeight: 'bold' }}>×</Text>
+              <Text style={{ color: isDark ? '#8A8E94' : '#999999', fontWeight: 'bold' }}>×</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <View style={styles.actionRow}>
-          {/* Quick Filters */}
-          <View style={styles.filterChips}>
-            {(['All', 'Available', 'Sold'] as const).map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[
-                  styles.filterChip,
-                  statusFilter === filter && styles.activeFilterChip,
-                  statusFilter !== filter && { backgroundColor: themeStyles.inputBg }
-                ]}
-                onPress={() => setStatusFilter(filter)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    statusFilter === filter ? styles.activeFilterChipText : { color: isDark ? '#b0b4ba' : '#60646c' }
-                  ]}
-                >
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
+          <Text style={styles.addProductText}>+ Add Product</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[
+            styles.filterButton, 
+            statusFilter !== 'All' && styles.filterButtonActive,
+            { backgroundColor: statusFilter !== 'All' ? '#8B5CF6' : theme.inputBg }
+          ]} 
+          onPress={toggleFilter}
+        >
+          <Text style={[
+            styles.filterButtonText, 
+            { color: statusFilter !== 'All' ? '#FFFFFF' : theme.text.color }
+          ]}>
+            Filter{statusFilter !== 'All' ? `: ${statusFilter}` : ''} ▽
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Car Listings ScrollView */}
-      <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scrollView}>
-        {filteredCars.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🚗💤</Text>
-            <Text style={[styles.emptyText, { color: isDark ? '#8a8e94' : '#666' }]}>
-              No cars found matching &quot;{searchQuery}&quot;
-            </Text>
-          </View>
-        ) : (
-          filteredCars.map((car) => (
-            <View key={car.id} style={[styles.carCard, themeStyles.cardBg, themeStyles.border]}>
-              {/* Car Card Header/Meta */}
-              <View style={styles.cardHeader}>
-                <View style={styles.emojiWrapper}>
-                  <Text style={styles.carEmoji}>{car.imageEmoji}</Text>
-                </View>
-                <View style={styles.titleWrapper}>
-                  <Text style={[styles.carBrand, { color: isDark ? '#b0b4ba' : '#666' }]}>
-                    {car.make}
+      {/* Slide 3: Product List */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Text style={[styles.emptyText, theme.textSecondary]}>No products found 📦</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {filteredProducts.map((product) => {
+            const isActive = product.badge_status === 'Active';
+            
+            return (
+              <TouchableOpacity
+                key={product.id}
+                style={[styles.productCard, theme.cardBg, theme.border]}
+                onPress={() => handleProductPress(product)}
+                activeOpacity={0.8}
+              >
+                {/* Left Side: Product Image & Name */}
+                <View style={styles.leftColumn}>
+                  <Image
+                    source={{ uri: product.image_url }}
+                    style={styles.productImage}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                  <Text style={[styles.productName, theme.text]} numberOfLines={2}>
+                    {product.name}
                   </Text>
-                  <Text style={[styles.carName, { color: isDark ? '#fff' : '#111' }]}>
-                    {car.model} <Text style={styles.carYear}>({car.year})</Text>
-                  </Text>
-                </View>
-                <View style={[
-                  styles.statusBadge,
-                  car.status === 'Available' ? styles.badgeAvailable : styles.badgeSold
-                ]}>
-                  <Text style={[
-                    styles.statusBadgeText,
-                    car.status === 'Available' ? styles.statusAvailableText : styles.statusSoldText
-                  ]}>
-                    {car.status}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Specifications row */}
-              <View style={[styles.specsRow, { borderColor: isDark ? '#2E3135' : '#f0f0f3' }]}>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Engine</Text>
-                  <Text style={[styles.specValue, { color: isDark ? '#fff' : '#333' }]}>{car.engine}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Mileage</Text>
-                  <Text style={[styles.specValue, { color: isDark ? '#fff' : '#333' }]}>
-                    {car.mileage.toLocaleString()} mi
-                  </Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Type</Text>
-                  <Text style={[styles.specValue, { color: isDark ? '#fff' : '#333' }]}>{car.type}</Text>
-                </View>
-              </View>
-
-              {/* Pricing & Action Area */}
-              <View style={styles.cardFooter}>
-                <View>
-                  <Text style={styles.priceLabel}>
-                    {car.status === 'Sold' ? 'Sold Price' : 'Asking Price'}
-                  </Text>
-                  <Text style={styles.priceValue}>
-                    ${(car.status === 'Sold' && car.sellPrice ? car.sellPrice : car.price).toLocaleString()}
-                  </Text>
-                  {car.status === 'Sold' && car.sellDate && (
-                    <Text style={[styles.soldDateText, { color: isDark ? '#8a8e94' : '#888' }]}>
-                      on {car.sellDate}
-                    </Text>
-                  )}
                 </View>
 
-                <View style={styles.cardActions}>
-                  {car.status === 'Available' ? (
-                    <>
-                      <TouchableOpacity
-                        style={styles.sellButton}
-                        onPress={() => handleOpenSellModal(car)}
-                      >
-                        <Text style={styles.sellButtonText}>Sell 💰</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => handleDelete(car)}
-                      >
-                        <Text style={styles.deleteButtonText}>🗑️</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.deleteButton, { opacity: 0.8 }]}
-                      onPress={() => handleDelete(car)}
+                {/* Right Side: Details & Badge Status */}
+                <View style={styles.rightColumn}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>Stock:</Text>
+                    <Text style={[styles.detailValue, theme.text]}>{product.stock_text}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>Category:</Text>
+                    <Text style={[styles.detailValue, theme.text]}>{product.category}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>Location:</Text>
+                    <Text style={[styles.detailValue, theme.text]}>{product.location_text}</Text>
+                  </View>
+
+                  <View style={styles.badgeRow}>
+                    <View style={[
+                      styles.statusBadge,
+                      isActive ? styles.badgeActive : styles.badgeLowStock
+                    ]}>
+                      <Text style={[
+                        styles.statusBadgeText,
+                        isActive ? styles.statusActiveText : styles.statusLowStockText
+                      ]}>
+                        {product.badge_status}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity 
+                      style={styles.arrowButton}
+                      onPress={() => handleProductPress(product)}
                     >
-                      <Text style={styles.deleteButtonText}>Delete History</Text>
+                      <Text style={styles.arrowButtonText}>›</Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {/* Selling Modal */}
       <Modal
@@ -305,141 +428,113 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   lightContainer: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
   },
   darkContainer: {
     backgroundColor: '#000000',
   },
-  lightText: {
-    color: '#000000',
-  },
-  darkText: {
-    color: '#ffffff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-  },
-  lightBorder: {
-    borderColor: '#e9ecef',
-  },
-  darkBorder: {
-    borderColor: '#212225',
-  },
-  menuButton: {
-    width: 30,
-    height: 30,
+  centerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  menuIcon: {
-    fontSize: 20,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 100, // inset for bottom tab nav
+  },
+  header: {
+    height: 60,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  headerButton: {
+    padding: 8,
+  },
+  headerIcon: {
+    fontSize: 22,
+    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#8B5CF6', // Purple signature
     letterSpacing: 0.5,
   },
   profileButton: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#8B5CF6',
-    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
   profileIcon: {
     fontSize: 16,
-    color: 'white',
+    color: '#FFFFFF',
   },
-  searchAndActionContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  searchBar: {
+  actionBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 10,
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+    fontSize: 14,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     height: '100%',
+    padding: 0,
   },
   clearSearch: {
-    padding: 6,
+    padding: 4,
   },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  addProductButton: {
+    backgroundColor: '#8B5CF6',
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  filterChips: {
-    flexDirection: 'row',
-    gap: 8,
+  addProductText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  filterButton: {
+    height: 40,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  activeFilterChip: {
+  filterButtonActive: {
     backgroundColor: '#8B5CF6',
   },
-  filterChipText: {
+  filterButtonText: {
     fontSize: 13,
     fontWeight: '600',
   },
-  activeFilterChipText: {
-    color: 'white',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100, // Safe inset for bottom menu
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  carCard: {
+  productCard: {
+    flexDirection: 'row',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -447,140 +542,107 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   lightCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
   },
   darkCard: {
     backgroundColor: '#161719',
   },
-  cardHeader: {
+  lightBorder: {
+    borderColor: '#E9ECEF',
+  },
+  darkBorder: {
+    borderColor: '#212225',
+  },
+  leftColumn: {
+    width: 110,
+    alignItems: 'center',
+  },
+  productImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#EAEAEA',
+  },
+  productName: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  rightColumn: {
+    flex: 1,
+    paddingLeft: 16,
+    justifyContent: 'center',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  detailLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    width: 75,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  emojiWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#f0f0f3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  carEmoji: {
-    fontSize: 22,
-  },
-  titleWrapper: {
-    flex: 1,
-  },
-  carBrand: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  carName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  carYear: {
-    fontWeight: '400',
-    fontSize: 14,
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  badgeAvailable: {
+  badgeActive: {
     backgroundColor: '#E8F5E9',
   },
-  badgeSold: {
-    backgroundColor: '#FFEBEE',
+  badgeLowStock: {
+    backgroundColor: '#EAE8FF',
   },
   statusBadgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
-  statusAvailableText: {
+  statusActiveText: {
     color: '#2E7D32',
   },
-  statusSoldText: {
-    color: '#C62828',
+  statusLowStockText: {
+    color: '#4F46E5',
   },
-  specsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    marginBottom: 12,
-  },
-  specItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  specLabel: {
-    fontSize: 10,
-    color: '#888',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  specValue: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 10,
-    color: '#888',
-    textTransform: 'uppercase',
-  },
-  priceValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#8B5CF6',
-  },
-  soldDateText: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  sellButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sellButtonText: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  deleteButton: {
-    backgroundColor: '#f0f0f3',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
+  arrowButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F0FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deleteButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#d32f2f',
+  arrowButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#8B5CF6',
+    marginTop: -2,
+  },
+  lightText: {
+    color: '#000000',
+  },
+  darkText: {
+    color: '#FFFFFF',
+  },
+  lightTextSecondary: {
+    color: '#666666',
+  },
+  darkTextSecondary: {
+    color: '#B0B4BA',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,

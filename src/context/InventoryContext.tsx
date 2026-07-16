@@ -14,6 +14,16 @@ export interface Car {
   sellPrice?: number;
   sellDate?: string;
   imageEmoji: string;
+
+  // Slide 4 matching fields
+  name?: string;
+  stock?: number;
+  stock_text?: string;
+  category?: string;
+  location_count?: number;
+  location_text?: string;
+  badge_status?: string;
+  image_url?: string;
 }
 
 export interface Sale {
@@ -30,6 +40,7 @@ interface InventoryContextType {
   addCar: (car: Omit<Car, 'id' | 'status'>) => void;
   sellCar: (carId: string, sellPrice: number) => void;
   deleteCar: (carId: string) => void;
+  setCars: React.Dispatch<React.SetStateAction<Car[]>>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -46,6 +57,14 @@ const initialCars: Car[] = [
     mileage: 8500,
     engine: 'Tri-Motor AWD',
     imageEmoji: '⚡',
+    name: 'Tesla Model S Plaid (2023)',
+    stock: 1,
+    stock_text: '1 in stock',
+    category: 'Electric',
+    location_count: 2,
+    location_text: '2 showrooms',
+    badge_status: 'Active',
+    image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=400&q=80'
   },
   {
     id: '2',
@@ -58,6 +77,14 @@ const initialCars: Car[] = [
     mileage: 12400,
     engine: '3.0L Twin-Turbo I6',
     imageEmoji: '🏁',
+    name: 'BMW M3 Competition (2022)',
+    stock: 1,
+    stock_text: '1 in stock',
+    category: 'Sports',
+    location_count: 3,
+    location_text: '3 showrooms',
+    badge_status: 'Active',
+    image_url: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=400&q=80'
   },
   {
     id: '3',
@@ -70,6 +97,14 @@ const initialCars: Car[] = [
     mileage: 1800,
     engine: '4.0L Flat-6',
     imageEmoji: '🏎️',
+    name: 'Porsche 911 GT3 RS (2023)',
+    stock: 1,
+    stock_text: '1 in stock',
+    category: 'Sports',
+    location_count: 1,
+    location_text: '1 showroom',
+    badge_status: 'Active',
+    image_url: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=400&q=80'
   },
   {
     id: '4',
@@ -81,9 +116,17 @@ const initialCars: Car[] = [
     type: 'SUV',
     mileage: 21500,
     engine: 'Single Motor RWD',
+    imageEmoji: '🔋',
     sellPrice: 44500,
     sellDate: '2026-07-01',
-    imageEmoji: '🔋',
+    name: 'Ford Mustang Mach-E (2022)',
+    stock: 0,
+    stock_text: 'Out of stock',
+    category: 'SUV',
+    location_count: 0,
+    location_text: '0 showrooms',
+    badge_status: 'Low in stock',
+    image_url: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&w=400&q=80'
   },
   {
     id: '5',
@@ -96,6 +139,14 @@ const initialCars: Car[] = [
     mileage: 9500,
     engine: '3.0L Turbo I6 MHEV',
     imageEmoji: '⛰️',
+    name: 'Range Rover Sport (2023)',
+    stock: 1,
+    stock_text: '1 in stock',
+    category: 'SUV',
+    location_count: 2,
+    location_text: '2 showrooms',
+    badge_status: 'Active',
+    image_url: 'https://images.unsplash.com/photo-1609521263047-f8f205293f24?auto=format&fit=crop&w=400&q=80'
   },
   {
     id: '6',
@@ -107,10 +158,18 @@ const initialCars: Car[] = [
     type: 'Sports',
     mileage: 25300,
     engine: '3.0L Turbo I6',
+    imageEmoji: '🇯🇵',
     sellPrice: 49800,
     sellDate: '2026-07-05',
-    imageEmoji: '🇯🇵',
-  },
+    name: 'Toyota GR Supra (2021)',
+    stock: 0,
+    stock_text: 'Out of stock',
+    category: 'Sports',
+    location_count: 0,
+    location_text: '0 showrooms',
+    badge_status: 'Low in stock',
+    image_url: 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=400&q=80'
+  }
 ];
 
 const initialSales: Sale[] = [
@@ -210,7 +269,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <InventoryContext.Provider value={{ cars, sales, addCar, sellCar, deleteCar }}>
+    <InventoryContext.Provider value={{ cars, sales, addCar, sellCar, deleteCar, setCars }}>
       {children}
     </InventoryContext.Provider>
   );
