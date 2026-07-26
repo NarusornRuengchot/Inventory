@@ -113,30 +113,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         console.warn('Could not fetch products from cloud DB API:', error.message);
       }
 
-      // Step 2: Fallback if cloud DB is not available
-      if (!success) {
-        try {
-          console.log('Falling back to static PRODUCTS_URL...');
-          const response = await fetch(PRODUCTS_URL);
-          if (response.ok) {
-            fetchedData = await response.json();
-            success = true;
-          }
-        } catch (error) {
-          console.warn('Could not fetch products from static URL:', error);
-        }
-      }
 
-      // Step 3: Local file fallback
-      if (!success) {
-        try {
-          console.log('Falling back to local products.json file...');
-          const localProducts = require('../../products.json');
-          fetchedData = localProducts as Car[];
-        } catch {
-          fetchedData = [];
-        }
-      }
 
       // Set state directly with the fetched database records
       const normalizedData = fetchedData.map((fetchedCar) => {
