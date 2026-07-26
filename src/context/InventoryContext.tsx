@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 export interface Car {
@@ -20,7 +20,7 @@ export interface Car {
   notes: string | null;
   created_at?: string;
   updated_at?: string;
-  
+
   // UI helper fields
   image_url?: string;
   image_emoji?: string;
@@ -36,6 +36,34 @@ export interface Sale {
 
 const PRODUCTS_URL = 'https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json';
 
+// Slide 27: Don't forget to declare the URL variable.
+// Please replace 3012 with your assigned backend port (e.g. from slide 13)
+const API_BASE_URL = 'http://119.59.102.161:3024/api';
+
+// Slide 23: If you have a login/authentication system, you can store and use the token here
+const authToken: string | null = null;
+
+// Slide 23: Enhanced API Call Function with better error handling for cloud
+const apiCall = async (endpoint: string, options: any = {}) => {
+  const config = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...options.headers,
+    },
+  };
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+};
+
+
 interface InventoryContextType {
   cars: Car[];
   sales: Sale[];
@@ -49,148 +77,15 @@ interface InventoryContextType {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-export const initialCars: Car[] = [
-  {
-    car_id: 1,
-    vin: '5YJSA1E21NF000001',
-    license_plate: 'กข-1234',
-    brand: 'Tesla',
-    model: 'Model S Plaid',
-    model_year: 2023,
-    color: 'White',
-    mileage: 8500,
-    transmission: 'Auto',
-    fuel_type: 'EV',
-    purchase_price: 78000,
-    selling_price: 89990,
-    status: 'Available',
-    purchase_date: '2023-05-10',
-    sold_date: null,
-    notes: 'Excellent condition, tri-motor AWD',
-    image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '⚡'
-  },
-  {
-    car_id: 2,
-    vin: 'WBS53AY00NC000002',
-    license_plate: 'ชย-5678',
-    brand: 'BMW',
-    model: 'M3 Competition',
-    model_year: 2022,
-    color: 'Gray',
-    mileage: 12400,
-    transmission: 'Auto',
-    fuel_type: 'Gasoline',
-    purchase_price: 65000,
-    selling_price: 74500,
-    status: 'Available',
-    purchase_date: '2022-09-15',
-    sold_date: null,
-    notes: '3.0L twin-turbo I6, pristine interior',
-    image_url: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '🏁'
-  },
-  {
-    car_id: 3,
-    vin: 'WP0AD2A90NS000003',
-    license_plate: 'ฏภ-911',
-    brand: 'Porsche',
-    model: '911 GT3 RS',
-    model_year: 2023,
-    color: 'Green',
-    mileage: 1800,
-    transmission: 'Auto',
-    fuel_type: 'Gasoline',
-    purchase_price: 200000,
-    selling_price: 223800,
-    status: 'Available',
-    purchase_date: '2023-11-20',
-    sold_date: null,
-    notes: 'Track-focused, 4.0L flat-6',
-    image_url: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '🏎️'
-  },
-  {
-    car_id: 4,
-    vin: '1FMCU0E10NK000004',
-    license_plate: 'ฮม-4321',
-    brand: 'Ford',
-    model: 'Mustang Mach-E',
-    model_year: 2022,
-    color: 'Blue',
-    mileage: 21500,
-    transmission: 'Auto',
-    fuel_type: 'EV',
-    purchase_price: 38000,
-    selling_price: 45990,
-    status: 'Sold',
-    purchase_date: '2022-04-05',
-    sold_date: '2026-07-01',
-    notes: 'Single motor RWD, minor scratches on rear bumper',
-    image_url: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '🔋'
-  },
-  {
-    car_id: 5,
-    vin: 'SALLS2D10NA000005',
-    license_plate: 'รร-777',
-    brand: 'Land Rover',
-    model: 'Range Rover Sport',
-    model_year: 2023,
-    color: 'Black',
-    mileage: 9500,
-    transmission: 'Auto',
-    fuel_type: 'Hybrid',
-    purchase_price: 90000,
-    selling_price: 104900,
-    status: 'Available',
-    purchase_date: '2023-07-18',
-    sold_date: null,
-    notes: '3.0L Turbo I6 MHEV, panoramic sunroof',
-    image_url: 'https://images.unsplash.com/photo-1609521263047-f8f205293f24?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '⛰️'
-  },
-  {
-    car_id: 6,
-    vin: 'JTDBA1D10NK000006',
-    license_plate: 'สส-88',
-    brand: 'Toyota',
-    model: 'GR Supra',
-    model_year: 2021,
-    color: 'Red',
-    mileage: 25300,
-    transmission: 'Auto',
-    fuel_type: 'Gasoline',
-    purchase_price: 43000,
-    selling_price: 50900,
-    status: 'Sold',
-    purchase_date: '2021-12-05',
-    sold_date: '2026-07-05',
-    notes: '3.0L Twin-scroll Turbo I6, custom exhaust',
-    image_url: 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=400&q=80',
-    image_emoji: '🇯🇵'
-  }
-];
+export const initialCars: Car[] = [];
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [cars, setCars] = useState<Car[]>(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      const saved = window.localStorage.getItem('carhub_cars_v2');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse saved cars:', e);
-        }
-      }
-    }
-    return initialCars;
-  });
+  const [cars, setCars] = useState<Car[]>([]);
 
   // Derived sales list based on cars with Sold status
   const sales: Sale[] = cars
-    .filter((car) => car.status === 'Sold')
+    .filter((car) => car && car.status === 'Sold' && (car.car_id !== undefined && car.car_id !== null))
     .map((car) => ({
       id: `s_${car.car_id}`,
       carId: car.car_id.toString(),
@@ -199,76 +94,77 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       sellDate: car.sold_date || new Date().toISOString().split('T')[0],
     }));
 
-  // Save to localStorage when state changes
-  useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem('carhub_cars_v2', JSON.stringify(cars));
-    }
-  }, [cars]);
-
   // Fetch/sync products on mount
   useEffect(() => {
     async function loadProducts() {
+      let fetchedData: Car[] = [];
+      let success = false;
+
+      // Step 1: Try fetching from our cloud DB (Node.js backend)
       try {
-        const response = await fetch(PRODUCTS_URL);
-        let fetchedData: Car[] = [];
-        if (response.ok) {
-          fetchedData = await response.json();
-        } else {
-          try {
-            const localProducts = require('../../products.json');
-            fetchedData = localProducts as Car[];
-          } catch {
-            fetchedData = initialCars;
-          }
+        console.log('Fetching products from cloud DB API:', `${API_BASE_URL}/products`);
+        const data = await apiCall('/products');
+        if (Array.isArray(data)) {
+          fetchedData = data;
+          success = true;
+          console.log(`Loaded ${data.length} products from cloud DB`);
         }
-
-        setCars((currentCars) => {
-          const merged = [...currentCars];
-          fetchedData.forEach((fetchedCar) => {
-            const index = merged.findIndex((c) => c.car_id === fetchedCar.car_id);
-            const fallbackCar = initialCars.find((c) => c.car_id === fetchedCar.car_id);
-            
-            const defaultFields = fallbackCar || {
-              vin: 'VIN_UNKNOWN_' + fetchedCar.car_id,
-              license_plate: 'PLATE_UNKNOWN',
-              brand: fetchedCar.brand || 'Unknown',
-              model: fetchedCar.model || 'Unknown',
-              model_year: fetchedCar.model_year || 2023,
-              color: fetchedCar.color || 'Unknown',
-              mileage: fetchedCar.mileage || 10000,
-              transmission: fetchedCar.transmission || 'Auto',
-              fuel_type: fetchedCar.fuel_type || 'Gasoline',
-              purchase_price: fetchedCar.purchase_price || 15000,
-              selling_price: fetchedCar.selling_price || 20000,
-              status: fetchedCar.status || 'Available',
-              purchase_date: fetchedCar.purchase_date || new Date().toISOString().split('T')[0],
-              sold_date: fetchedCar.sold_date || null,
-              notes: fetchedCar.notes || '',
-              image_url: fetchedCar.image_url,
-              image_emoji: fetchedCar.image_emoji
-            };
-
-            if (index > -1) {
-              merged[index] = {
-                ...defaultFields,
-                ...merged[index],
-                ...fetchedCar,
-              };
-            } else {
-              merged.push({
-                ...defaultFields,
-                ...fetchedCar,
-              });
-            }
-          });
-          return merged;
-        });
-      } catch (error) {
-        console.warn('Could not fetch products on init:', error);
-      } finally {
-        setLoading(false);
+      } catch (error: any) {
+        console.warn('Could not fetch products from cloud DB API:', error.message);
       }
+
+      // Step 2: Fallback if cloud DB is not available
+      if (!success) {
+        try {
+          console.log('Falling back to static PRODUCTS_URL...');
+          const response = await fetch(PRODUCTS_URL);
+          if (response.ok) {
+            fetchedData = await response.json();
+            success = true;
+          }
+        } catch (error) {
+          console.warn('Could not fetch products from static URL:', error);
+        }
+      }
+
+      // Step 3: Local file fallback
+      if (!success) {
+        try {
+          console.log('Falling back to local products.json file...');
+          const localProducts = require('../../products.json');
+          fetchedData = localProducts as Car[];
+        } catch {
+          fetchedData = [];
+        }
+      }
+
+      // Set state directly with the fetched database records
+      const normalizedData = fetchedData.map((fetchedCar) => {
+        const fetchedId = fetchedCar.car_id || (fetchedCar as any).id || Math.floor(Math.random() * 100000);
+        return {
+          car_id: Number(fetchedId),
+          vin: fetchedCar.vin || 'VIN_UNKNOWN_' + fetchedId,
+          license_plate: fetchedCar.license_plate || (fetchedCar as any).location || 'PLATE_UNKNOWN',
+          brand: fetchedCar.brand || 'Unknown',
+          model: fetchedCar.model || fetchedCar.name || 'Unknown',
+          model_year: fetchedCar.model_year || 2023,
+          color: fetchedCar.color || 'Unknown',
+          mileage: fetchedCar.mileage || 10000,
+          transmission: fetchedCar.transmission || 'Auto',
+          fuel_type: fetchedCar.fuel_type || 'Gasoline',
+          purchase_price: fetchedCar.purchase_price || 15000,
+          selling_price: fetchedCar.selling_price || (fetchedCar as any).price || 20000,
+          status: fetchedCar.status || 'Available',
+          purchase_date: fetchedCar.purchase_date || new Date().toISOString().split('T')[0],
+          sold_date: fetchedCar.sold_date || null,
+          notes: fetchedCar.notes || '',
+          image_url: fetchedCar.image_url || (fetchedCar as any).image,
+          image_emoji: fetchedCar.image_emoji
+        };
+      });
+
+      setCars(normalizedData);
+      setLoading(false);
     }
 
     loadProducts();

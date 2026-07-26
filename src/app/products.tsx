@@ -40,14 +40,15 @@ function getImageUrlForEmoji(emoji: string): string {
 }
 
 function deriveProductFromCar(car: Car): Product {
+  const carId = car.car_id || (car as any).id || Math.floor(Math.random() * 100000);
   return {
-    id: car.car_id.toString(),
-    name: `${car.brand} ${car.model} (${car.model_year})`,
-    stock_text: car.status === 'Available' ? 'Ready' : car.status,
-    category: `${car.fuel_type} / ${car.transmission}`,
-    location_text: car.license_plate,
-    badge_status: car.status,
-    image_url: car.image_url || getImageUrlForEmoji(car.image_emoji || ''),
+    id: carId.toString(),
+    name: `${car.brand || 'Unknown'} ${car.model || car.name || 'Model'} (${car.model_year || 2023})`,
+    stock_text: car.status === 'Available' ? 'Ready' : car.status || 'Unknown',
+    category: `${car.fuel_type || 'Gasoline'} / ${car.transmission || 'Auto'}`,
+    location_text: car.license_plate || (car as any).location || 'Unknown',
+    badge_status: car.status || 'Available',
+    image_url: car.image_url || (car as any).image || getImageUrlForEmoji(car.image_emoji || ''),
     originalCar: car,
   };
 }
