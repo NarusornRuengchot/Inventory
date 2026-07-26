@@ -1,8 +1,4 @@
-import { Car, useInventory } from '@/context/InventoryContext';
-import { customAlert } from '@/utils/alert';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,24 +13,20 @@ import {
   useColorScheme,
   View
 } from 'react-native';
-
-// Import local JSON fallback
-
-// Raw GitHub URL as requested in Slide 11
-// Replace USERNAME/REPOSITORY with the actual GitHub details when pushing
-const PRODUCTS_URL = 'https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { Car, useInventory } from '@/context/InventoryContext';
+import { customAlert } from '@/utils/alert';
 
 interface Product {
   id: string;
   name: string;
-  stock: number;
   stock_text: string;
   category: string;
-  location_count: number;
   location_text: string;
-  badge_status: string;
+  badge_status: Car['status'];
   image_url: string;
-  originalCar: Car; // reference back to inventory context object
+  originalCar: Car;
 }
 
 function getImageUrlForEmoji(emoji: string): string {
@@ -48,17 +40,14 @@ function getImageUrlForEmoji(emoji: string): string {
 }
 
 function deriveProductFromCar(car: Car): Product {
-  const isAvailable = car.status === 'Available';
   return {
-    id: car.id,
-    name: car.name || `${car.make} ${car.model} (${car.year})`,
-    stock: car.stock !== undefined ? car.stock : (isAvailable ? 1 : 0),
-    stock_text: car.stock_text || (isAvailable ? '1 in stock' : 'Out of stock'),
-    category: car.category || car.type,
-    location_count: car.location_count !== undefined ? car.location_count : (isAvailable ? 1 : 0),
-    location_text: car.location_text || (isAvailable ? '1 showroom' : '0 showrooms'),
-    badge_status: car.status === 'Sold' ? 'Low in stock' : (car.badge_status || 'Active'),
-    image_url: car.image_url || getImageUrlForEmoji(car.imageEmoji),
+    id: car.car_id.toString(),
+    name: `${car.brand} ${car.model} (${car.model_year})`,
+    stock_text: car.status === 'Available' ? 'Ready' : car.status,
+    category: `${car.fuel_type} / ${car.transmission}`,
+    location_text: car.license_plate,
+    badge_status: car.status,
+    image_url: car.image_url || getImageUrlForEmoji(car.image_emoji || ''),
     originalCar: car,
   };
 }
@@ -68,9 +57,9 @@ export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { cars, setCars, sellCar, deleteCar, updateCar, loading } = useInventory();
+  const { cars, sellCar, deleteCar, updateCar, loading } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Low in stock'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | Car['status']>('All');
 
   // State for Sell Modal
   const [sellModalVisible, setSellModalVisible] = useState(false);
@@ -80,19 +69,32 @@ export default function ProductsScreen() {
   // State for Edit Modal
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editPrice, setEditPrice] = useState('');
-  const [editCategory, setEditCategory] = useState('');
-  const [editStock, setEditStock] = useState('');
-  const [editLocationText, setEditLocationText] = useState('');
+
+  // Edit fields
+  const [editBrand, setEditBrand] = useState('');
+  const [editModel, setEditModel] = useState('');
+  const [editModelYear, setEditModelYear] = useState('');
+  const [editVin, setEditVin] = useState('');
+  const [editLicensePlate, setEditLicensePlate] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [editMileage, setEditMileage] = useState('');
+  const [editTransmission, setEditTransmission] = useState<Car['transmission']>('Auto');
+  const [editFuelType, setEditFuelType] = useState<Car['fuel_type']>('Gasoline');
+  const [editPurchasePrice, setEditPurchasePrice] = useState('');
+  const [editSellingPrice, setEditSellingPrice] = useState('');
+  const [editStatus, setEditStatus] = useState<Car['status']>('Available');
+  const [editNotes, setEditNotes] = useState('');
 
   // Map all context cars to product schema
   const products = cars.map(deriveProductFromCar);
 
   // Filter products based on search query and status filter
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.originalCar.vin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.originalCar.license_plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.originalCar.color.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'All' ? true : product.badge_status === statusFilter;
 
@@ -101,77 +103,106 @@ export default function ProductsScreen() {
 
   const handleProductPress = (product: Product) => {
     const car = product.originalCar;
-    if (car.status === 'Available') {
-      customAlert(
-        product.name,
-        `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nPrice: $${(car.price ?? 0).toLocaleString()}\nStatus: ${car.status}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
-          { text: 'Sell 💰', onPress: () => handleOpenSellModal(car) },
-          { text: 'Delete 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
-        ]
-      );
-    } else {
-      customAlert(
-        product.name,
-        `Category: ${product.category}\nStock: ${product.stock_text}\nLocation: ${product.location_text}\nSold Price: $${(car.sellPrice ?? car.price ?? 0).toLocaleString()}\nSold Date: ${car.sellDate ?? 'N/A'}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
-          { text: 'Delete History 🗑️', style: 'destructive', onPress: () => handleDelete(car) }
-        ]
-      );
+    const details = [
+      `VIN: ${car.vin}`,
+      `Plate: ${car.license_plate}`,
+      `Color: ${car.color}`,
+      `Mileage: ${car.mileage.toLocaleString()} km`,
+      `Transmission: ${car.transmission}`,
+      `Fuel Type: ${car.fuel_type}`,
+      `Purchase Cost: $${car.purchase_price.toLocaleString()}`,
+      `Selling Price: $${car.selling_price.toLocaleString()}`,
+      `Status: ${car.status}`,
+      `Purchase Date: ${car.purchase_date}`,
+    ];
+    if (car.status === 'Sold' && car.sold_date) {
+      details.push(`Sold Date: ${car.sold_date}`);
     }
+    if (car.notes) {
+      details.push(`Notes: ${car.notes}`);
+    }
+
+    const buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
+    ];
+    if (car.status !== 'Sold') {
+      buttons.push({ text: 'Sell 💰', onPress: () => handleOpenSellModal(car) });
+    }
+    buttons.push({ text: 'Delete 🗑️', style: 'destructive', onPress: () => handleDelete(car) });
+
+    customAlert(
+      `${car.brand} ${car.model} (${car.model_year})`,
+      details.join('\n'),
+      buttons
+    );
   };
 
   const handleOpenEditModal = (car: Car) => {
     setEditingCar(car);
-    const product = deriveProductFromCar(car);
-    setEditName(product.name);
-    setEditPrice((car.price ?? 0).toString());
-    setEditCategory(product.category);
-    setEditStock((product.stock).toString());
-    setEditLocationText(product.location_text);
+    setEditBrand(car.brand);
+    setEditModel(car.model);
+    setEditModelYear(car.model_year.toString());
+    setEditVin(car.vin);
+    setEditLicensePlate(car.license_plate);
+    setEditColor(car.color);
+    setEditMileage(car.mileage.toString());
+    setEditTransmission(car.transmission);
+    setEditFuelType(car.fuel_type);
+    setEditPurchasePrice(car.purchase_price.toString());
+    setEditSellingPrice(car.selling_price.toString());
+    setEditStatus(car.status);
+    setEditNotes(car.notes || '');
     setEditModalVisible(true);
   };
 
   const handleConfirmEdit = () => {
     if (!editingCar) return;
-    const priceVal = parseFloat(editPrice);
-    const stockVal = parseInt(editStock);
+    const yearVal = parseInt(editModelYear);
+    const mileageVal = parseInt(editMileage);
+    const purchaseVal = parseFloat(editPurchasePrice);
+    const sellingVal = parseFloat(editSellingPrice);
 
-    if (!editName.trim() || !editCategory.trim() || isNaN(priceVal) || priceVal < 0 || isNaN(stockVal) || stockVal < 0) {
-      customAlert('Invalid Input', 'Please fill in all fields with valid values.');
+    if (
+      !editBrand.trim() ||
+      !editModel.trim() ||
+      isNaN(yearVal) ||
+      !editVin.trim() ||
+      !editLicensePlate.trim() ||
+      !editColor.trim() ||
+      isNaN(mileageVal) ||
+      isNaN(purchaseVal) ||
+      isNaN(sellingVal)
+    ) {
+      customAlert('Invalid Input', 'Please fill in all required fields.');
       return;
     }
 
-    const nameParts = editName.trim().split(' ');
-    const makeVal = nameParts[0] || 'Unknown';
-    const modelVal = nameParts.slice(1).join(' ').replace(/\s*\(\d{4}\)$/, '') || 'Model';
-
-    updateCar(editingCar.id, {
-      name: editName.trim(),
-      make: makeVal,
-      model: modelVal,
-      price: priceVal,
-      category: editCategory.trim(),
-      type: (editCategory.trim() as any),
-      stock: stockVal,
-      stock_text: `${stockVal} in stock`,
-      location_count: stockVal > 0 ? 2 : 0,
-      location_text: editLocationText.trim(),
-      badge_status: stockVal > 0 ? 'Active' : 'Low in stock',
+    updateCar(editingCar.car_id, {
+      brand: editBrand.trim(),
+      model: editModel.trim(),
+      model_year: yearVal,
+      vin: editVin.trim().toUpperCase(),
+      license_plate: editLicensePlate.trim(),
+      color: editColor.trim(),
+      mileage: mileageVal,
+      transmission: editTransmission,
+      fuel_type: editFuelType,
+      purchase_price: purchaseVal,
+      selling_price: sellingVal,
+      status: editStatus,
+      notes: editNotes.trim() || null,
+      sold_date: editStatus === 'Sold' ? (editingCar.sold_date || new Date().toISOString().split('T')[0]) : null,
     });
 
     setEditModalVisible(false);
     setEditingCar(null);
-    customAlert('Success', 'Product updated successfully.');
+    customAlert('Success', 'Car details updated successfully.');
   };
 
   const handleOpenSellModal = (car: Car) => {
     setSelectedCar(car);
-    setSellPriceInput(car.price.toString());
+    setSellPriceInput(car.selling_price.toString());
     setSellModalVisible(true);
   };
 
@@ -182,23 +213,23 @@ export default function ProductsScreen() {
       customAlert('Invalid Price', 'Please enter a valid selling price.');
       return;
     }
-    sellCar(selectedCar.id, price);
+    sellCar(selectedCar.car_id, price);
     setSellModalVisible(false);
     setSelectedCar(null);
     setSellPriceInput('');
-    customAlert('Car Sold!', `${selectedCar.make} ${selectedCar.model} sold for $${price.toLocaleString()}.`);
+    customAlert('Car Sold!', `${selectedCar.brand} ${selectedCar.model} sold for $${price.toLocaleString()}.`);
   };
 
   const handleDelete = (car: Car) => {
     customAlert(
       'Delete Car',
-      `Are you sure you want to remove this ${car.year} ${car.make} ${car.model} from inventory?`,
+      `Are you sure you want to remove this ${car.model_year} ${car.brand} ${car.model} from inventory?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteCar(car.id),
+          onPress: () => deleteCar(car.car_id),
         },
       ]
     );
@@ -209,10 +240,25 @@ export default function ProductsScreen() {
   };
 
   const toggleFilter = () => {
-    // Cycles filter status
-    if (statusFilter === 'All') setStatusFilter('Active');
-    else if (statusFilter === 'Active') setStatusFilter('Low in stock');
-    else setStatusFilter('All');
+    const statuses: ('All' | Car['status'])[] = ['All', 'Available', 'Reserved', 'Maintenance', 'Sold'];
+    const currentIndex = statuses.indexOf(statusFilter);
+    const nextIndex = (currentIndex + 1) % statuses.length;
+    setStatusFilter(statuses[nextIndex]);
+  };
+
+  const getStatusBadgeStyle = (status: Car['status']) => {
+    switch (status) {
+      case 'Available':
+        return { bg: '#E8F5E9', text: '#2E7D32' };
+      case 'Reserved':
+        return { bg: '#FFF3E0', text: '#EF6C00' };
+      case 'Maintenance':
+        return { bg: '#E3F2FD', text: '#1565C0' };
+      case 'Sold':
+        return { bg: '#EDE7F6', text: '#5E35B1' };
+      default:
+        return { bg: '#F5F5F5', text: '#9E9E9E' };
+    }
   };
 
   // Theme colors
@@ -231,7 +277,7 @@ export default function ProductsScreen() {
     <SafeAreaView style={[styles.container, theme.container]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
 
-      {/* Slide 3: Header Component */}
+      {/* Header */}
       <View style={[styles.header, theme.border, { backgroundColor: theme.headerBg }]}>
         <TouchableOpacity style={styles.headerButton}>
           <Text style={[styles.headerIcon, { color: theme.text.color }]}>☰</Text>
@@ -244,13 +290,13 @@ export default function ProductsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Slide 3: Action Bar */}
+      {/* Action Bar */}
       <View style={styles.actionBarContainer}>
         <View style={[styles.searchBar, { backgroundColor: theme.inputBg }]}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={[styles.searchInput, { color: theme.inputText }]}
-            placeholder="Search cars..."
+            placeholder="Search brand, vin, plate..."
             placeholderTextColor={isDark ? '#8A8E94' : '#999999'}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -263,7 +309,7 @@ export default function ProductsScreen() {
         </View>
 
         <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
-          <Text style={styles.addProductText}>+ Add Product</Text>
+          <Text style={styles.addProductText}>+ Add Car</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -283,14 +329,14 @@ export default function ProductsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Slide 3: Product List */}
+      {/* Product List */}
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#8B5CF6" />
         </View>
       ) : filteredProducts.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Text style={[styles.emptyText, theme.textSecondary]}>No products found 📦</Text>
+          <Text style={[styles.emptyText, theme.textSecondary]}>No cars found 📦</Text>
         </View>
       ) : (
         <FlatList
@@ -298,7 +344,7 @@ export default function ProductsScreen() {
           keyExtractor={(product) => product.id}
           contentContainerStyle={styles.scrollContent}
           renderItem={({ item: product }) => {
-            const isActive = product.badge_status === 'Active';
+            const badgeColors = getStatusBadgeStyle(product.badge_status);
 
             return (
               <TouchableOpacity
@@ -322,28 +368,30 @@ export default function ProductsScreen() {
                 {/* Right Side: Details & Badge Status */}
                 <View style={styles.rightColumn}>
                   <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>Stock:</Text>
-                    <Text style={[styles.detailValue, theme.text]}>{product.stock_text}</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>Category:</Text>
-                    <Text style={[styles.detailValue, theme.text]}>{product.category}</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>Location:</Text>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>License:</Text>
                     <Text style={[styles.detailValue, theme.text]}>{product.location_text}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>Fuel/Gear:</Text>
+                    <Text style={[styles.detailValue, theme.text]} numberOfLines={1}>{product.category}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>Price:</Text>
+                    <Text style={[styles.detailValue, { color: '#8B5CF6', fontWeight: '800' }]}>
+                      ${product.originalCar.selling_price.toLocaleString()}
+                    </Text>
                   </View>
 
                   <View style={styles.badgeRow}>
                     <View style={[
                       styles.statusBadge,
-                      isActive ? styles.badgeActive : styles.badgeLowStock
+                      { backgroundColor: badgeColors.bg }
                     ]}>
                       <Text style={[
                         styles.statusBadgeText,
-                        isActive ? styles.statusActiveText : styles.statusLowStockText
+                        { color: badgeColors.text }
                       ]}>
                         {product.badge_status}
                       </Text>
@@ -375,7 +423,7 @@ export default function ProductsScreen() {
             <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Record Car Sale</Text>
             {selectedCar && (
               <Text style={[styles.modalCarName, { color: isDark ? '#b0b4ba' : '#666' }]}>
-                {selectedCar.year} {selectedCar.make} {selectedCar.model}
+                {selectedCar.model_year} {selectedCar.brand} {selectedCar.model}
               </Text>
             )}
 
@@ -422,83 +470,245 @@ export default function ProductsScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#212225' : '#ffffff' }]}>
-            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Edit Product</Text>
+          <View style={[styles.modalContent, styles.modalContentLarge, { backgroundColor: isDark ? '#1C1D20' : '#ffffff' }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Edit Car Details</Text>
 
-            <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
-              <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Product Name</Text>
-                <TextInput
-                  style={[styles.modalInput, {
-                    borderColor: isDark ? '#2E3135' : '#ddd',
-                    color: isDark ? '#fff' : '#000',
-                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                  }]}
-                  value={editName}
-                  onChangeText={setEditName}
-                  placeholder="Product name"
-                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
-                />
+            <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
+              {/* Brand & Model */}
+              <View style={styles.flexRow}>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Brand *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    value={editBrand}
+                    onChangeText={setEditBrand}
+                    placeholder="e.g. Toyota"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Model *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    value={editModel}
+                    onChangeText={setEditModel}
+                    placeholder="e.g. Camry"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Price ($)</Text>
-                <TextInput
-                  style={[styles.modalInput, {
-                    borderColor: isDark ? '#2E3135' : '#ddd',
-                    color: isDark ? '#fff' : '#000',
-                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                  }]}
-                  keyboardType="numeric"
-                  value={editPrice}
-                  onChangeText={setEditPrice}
-                  placeholder="Price"
-                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
-                />
+              {/* Model Year & Color */}
+              <View style={styles.flexRow}>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Model Year *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    keyboardType="numeric"
+                    value={editModelYear}
+                    onChangeText={setEditModelYear}
+                    placeholder="e.g. 2022"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Color *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    value={editColor}
+                    onChangeText={setEditColor}
+                    placeholder="e.g. Red"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Category</Text>
-                <TextInput
-                  style={[styles.modalInput, {
-                    borderColor: isDark ? '#2E3135' : '#ddd',
-                    color: isDark ? '#fff' : '#000',
-                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                  }]}
-                  value={editCategory}
-                  onChangeText={setEditCategory}
-                  placeholder="Category (e.g. Electric, Sports, SUV)"
-                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
-                />
+              {/* VIN & License Plate */}
+              <View style={styles.flexRow}>
+                <View style={[styles.modalInputGroup, { flex: 1.2 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>VIN *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    autoCapitalize="characters"
+                    maxLength={17}
+                    value={editVin}
+                    onChangeText={setEditVin}
+                    placeholder="17-digit VIN"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+                <View style={[styles.modalInputGroup, { flex: 0.8 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Plate *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    value={editLicensePlate}
+                    onChangeText={setEditLicensePlate}
+                    placeholder="กข-1234"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Stock</Text>
-                <TextInput
-                  style={[styles.modalInput, {
-                    borderColor: isDark ? '#2E3135' : '#ddd',
-                    color: isDark ? '#fff' : '#000',
-                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                  }]}
-                  keyboardType="numeric"
-                  value={editStock}
-                  onChangeText={setEditStock}
-                  placeholder="Stock quantity"
-                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
-                />
+              {/* Mileage & Transmission */}
+              <View style={styles.flexRow}>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Mileage (km) *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    keyboardType="numeric"
+                    value={editMileage}
+                    onChangeText={setEditMileage}
+                    placeholder="km"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Transmission</Text>
+                  <View style={styles.selectorRow}>
+                    {(['Auto', 'Manual'] as const).map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        style={[
+                          styles.selectorBtn,
+                          editTransmission === t && styles.selectorBtnActive,
+                          { borderColor: isDark ? '#3E4249' : '#ddd' }
+                        ]}
+                        onPress={() => setEditTransmission(t)}
+                      >
+                        <Text style={[
+                          styles.selectorBtnText,
+                          editTransmission === t ? styles.selectorTextActive : { color: isDark ? '#fff' : '#333' }
+                        ]}>{t}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
               </View>
 
+              {/* Fuel Type */}
               <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Location</Text>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Fuel Type</Text>
+                <View style={styles.selectorRow}>
+                  {(['Gasoline', 'Diesel', 'EV', 'Hybrid'] as const).map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[
+                        styles.selectorBtn,
+                        styles.selectorBtnQuarter,
+                        editFuelType === f && styles.selectorBtnActive,
+                        { borderColor: isDark ? '#3E4249' : '#ddd' }
+                      ]}
+                      onPress={() => setEditFuelType(f)}
+                    >
+                      <Text style={[
+                        styles.selectorBtnText,
+                        editFuelType === f ? styles.selectorTextActive : { color: isDark ? '#fff' : '#333' }
+                      ]}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Purchase & Selling Prices */}
+              <View style={styles.flexRow}>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Purchase Price ($) *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    keyboardType="numeric"
+                    value={editPurchasePrice}
+                    onChangeText={setEditPurchasePrice}
+                    placeholder="Cost"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+                <View style={[styles.modalInputGroup, { flex: 1 }]}>
+                  <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Selling Price ($) *</Text>
+                  <TextInput
+                    style={[styles.modalInput, {
+                      borderColor: isDark ? '#2E3135' : '#ddd',
+                      color: isDark ? '#fff' : '#000',
+                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    }]}
+                    keyboardType="numeric"
+                    value={editSellingPrice}
+                    onChangeText={setEditSellingPrice}
+                    placeholder="Retail"
+                    placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  />
+                </View>
+              </View>
+
+              {/* Status */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Status</Text>
+                <View style={styles.selectorRow}>
+                  {(['Available', 'Reserved', 'Maintenance', 'Sold'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[
+                        styles.selectorBtn,
+                        styles.selectorBtnQuarter,
+                        editStatus === s && styles.selectorBtnActive,
+                        { borderColor: isDark ? '#3E4249' : '#ddd' }
+                      ]}
+                      onPress={() => setEditStatus(s)}
+                    >
+                      <Text style={[
+                        styles.selectorBtnText,
+                        editStatus === s ? styles.selectorTextActive : { color: isDark ? '#fff' : '#333' }
+                      ]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Notes */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Notes</Text>
                 <TextInput
-                  style={[styles.modalInput, {
+                  style={[styles.modalInput, styles.modalInputTextarea, {
                     borderColor: isDark ? '#2E3135' : '#ddd',
                     color: isDark ? '#fff' : '#000',
                     backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
                   }]}
-                  value={editLocationText}
-                  onChangeText={setEditLocationText}
-                  placeholder="Location (e.g. 2 showrooms)"
+                  multiline={true}
+                  numberOfLines={3}
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                  placeholder="Additional options, condition details..."
                   placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 />
               </View>
@@ -515,7 +725,7 @@ export default function ProductsScreen() {
                 style={[styles.modalBtn, styles.modalBtnConfirm]}
                 onPress={handleConfirmEdit}
               >
-                <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
+                <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save Changes</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -542,7 +752,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100, // inset for bottom tab nav
+    paddingBottom: 100,
   },
   header: {
     height: 60,
@@ -655,83 +865,8 @@ const styles = StyleSheet.create({
   darkBorder: {
     borderColor: '#212225',
   },
-  leftColumn: {
-    width: 110,
-    alignItems: 'center',
-  },
-  productImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    backgroundColor: '#EAEAEA',
-  },
-  productName: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  rightColumn: {
-    flex: 1,
-    paddingLeft: 16,
-    justifyContent: 'center',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  detailLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    width: 75,
-  },
-  detailValue: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  badgeActive: {
-    backgroundColor: '#E8F5E9',
-  },
-  badgeLowStock: {
-    backgroundColor: '#EAE8FF',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  statusActiveText: {
-    color: '#2E7D32',
-  },
-  statusLowStockText: {
-    color: '#4F46E5',
-  },
-  arrowButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3F0FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  arrowButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#8B5CF6',
-    marginTop: -2,
-  },
   lightText: {
-    color: '#000000',
+    color: '#111111',
   },
   darkText: {
     color: '#FFFFFF',
@@ -742,57 +877,157 @@ const styles = StyleSheet.create({
   darkTextSecondary: {
     color: '#B0B4BA',
   },
-  emptyText: {
-    fontSize: 16,
+  leftColumn: {
+    flex: 1,
+    gap: 10,
+  },
+  productImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#EAEAEA',
+  },
+  productName: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  rightColumn: {
+    flex: 1,
+    paddingLeft: 16,
+    justifyContent: 'space-between',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailLabel: {
+    fontSize: 12,
     fontWeight: '500',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  detailValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  arrowButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F3',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+  },
+  arrowButtonText: {
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontWeight: '800',
+    marginTop: -2,
+  },
+  emptyText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
+    maxHeight: '90%',
+  },
+  modalContentLarge: {
+    height: '85%',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: '800',
+    marginBottom: 16,
     textAlign: 'center',
   },
   modalCarName: {
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '600',
     marginBottom: 20,
+    textAlign: 'center',
   },
   modalInputGroup: {
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 14,
   },
   modalInputLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 8,
   },
   modalInput: {
+    height: 44,
     borderWidth: 1,
-    borderRadius: 12,
-    height: 48,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  modalInputTextarea: {
+    height: 80,
+    paddingVertical: 10,
+    textAlignVertical: 'top',
+  },
+  flexRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  selectorBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  selectorBtnQuarter: {
+    flex: 1,
+  },
+  selectorBtnActive: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  selectorBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  selectorTextActive: {
+    color: '#FFFFFF',
   },
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 10,
   },
   modalBtn: {
     flex: 1,
@@ -801,14 +1036,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalBtnCancel: {
-    backgroundColor: '#f0f0f0',
-  },
+  modalBtnCancel: {},
   modalBtnConfirm: {
     backgroundColor: '#8B5CF6',
   },
   modalBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

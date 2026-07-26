@@ -18,32 +18,32 @@ export default function CategoriesScreen() {
   
   const { cars } = useInventory();
 
-  // Group by Brand (Make)
+  // Group by Brand
   const brandStats = cars.reduce((acc, car) => {
-    if (!acc[car.make]) {
-      acc[car.make] = { count: 0, totalValue: 0, available: 0, sold: 0, emoji: car.imageEmoji };
+    if (!acc[car.brand]) {
+      acc[car.brand] = { count: 0, totalValue: 0, available: 0, sold: 0, emoji: car.image_emoji || '🚗' };
     }
-    acc[car.make].count += 1;
-    acc[car.make].totalValue += car.price;
+    acc[car.brand].count += 1;
+    acc[car.brand].totalValue += car.selling_price;
     if (car.status === 'Available') {
-      acc[car.make].available += 1;
-    } else {
-      acc[car.make].sold += 1;
+      acc[car.brand].available += 1;
+    } else if (car.status === 'Sold') {
+      acc[car.brand].sold += 1;
     }
     return acc;
   }, {} as Record<string, { count: number; totalValue: number; available: number; sold: number; emoji: string }>);
 
-  // Group by Vehicle Category
-  const typeStats = cars.reduce((acc, car) => {
-    const category = car.category || car.type;
+  // Group by Fuel Type
+  const fuelStats = cars.reduce((acc, car) => {
+    const category = car.fuel_type || 'Gasoline';
     if (!acc[category]) {
       acc[category] = { count: 0, totalValue: 0, available: 0, sold: 0 };
     }
     acc[category].count += 1;
-    acc[category].totalValue += car.price;
+    acc[category].totalValue += car.selling_price;
     if (car.status === 'Available') {
       acc[category].available += 1;
-    } else {
+    } else if (car.status === 'Sold') {
       acc[category].sold += 1;
     }
     return acc;
@@ -75,7 +75,7 @@ export default function CategoriesScreen() {
                 <View style={styles.emojiCircle}>
                   <Text style={styles.emojiText}>{stat.emoji}</Text>
                 </View>
-                <Text style={[styles.brandName, { color: themeStyles.text }]}>{brand}</Text>
+                <Text style={[styles.brandName, { color: themeStyles.text }]} numberOfLines={1}>{brand}</Text>
               </View>
               
               <View style={styles.statsRow}>
@@ -84,7 +84,7 @@ export default function CategoriesScreen() {
                   <Text style={[styles.statValue, { color: themeStyles.text }]}>{stat.count}</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Available</Text>
+                  <Text style={styles.statLabel}>Avail</Text>
                   <Text style={[styles.statValue, { color: '#2E7D32' }]}>{stat.available}</Text>
                 </View>
                 <View style={styles.statItem}>
@@ -94,18 +94,18 @@ export default function CategoriesScreen() {
               </View>
 
               <View style={styles.valueRow}>
-                <Text style={styles.valueLabel}>Inventory Value</Text>
+                <Text style={styles.valueLabel}>Listed Value</Text>
                 <Text style={styles.valueText}>${stat.totalValue.toLocaleString()}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        {/* Section: Categories */}
-        <Text style={[styles.sectionTitle, { color: themeStyles.text, marginTop: 24 }]}>Categories</Text>
+        {/* Section: Fuel Types */}
+        <Text style={[styles.sectionTitle, { color: themeStyles.text, marginTop: 24 }]}>Fuel Types</Text>
         
         <View style={styles.typeList}>
-          {Object.entries(typeStats).map(([type, stat]) => {
+          {Object.entries(fuelStats).map(([type, stat]) => {
             const progress = stat.count > 0 ? (stat.available / stat.count) * 100 : 0;
             return (
               <View key={type} style={[styles.typeCard, themeStyles.cardBg, themeStyles.border]}>
@@ -148,43 +148,11 @@ const styles = StyleSheet.create({
   darkContainer: {
     backgroundColor: '#000000',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-  },
   lightBorder: {
     borderColor: '#e9ecef',
   },
   darkBorder: {
     borderColor: '#212225',
-  },
-  menuButton: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#8B5CF6',
-    letterSpacing: 0.5,
-  },
-  profileButton: {
-    width: 34,
-    height: 34,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileIcon: {
-    fontSize: 16,
-    color: 'white',
   },
   scrollContent: {
     padding: 16,

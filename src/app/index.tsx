@@ -25,7 +25,7 @@ export default function HomeScreen() {
   const availableCars = cars.filter((c) => c.status === 'Available');
   const soldCars = cars.filter((c) => c.status === 'Sold');
 
-  const totalValueAvailable = availableCars.reduce((sum, c) => sum + c.price, 0);
+  const totalValueAvailable = availableCars.reduce((sum, c) => sum + c.selling_price, 0);
   const totalRevenue = sales.reduce((sum, s) => sum + s.sellPrice, 0);
 
   const themeStyles = {
