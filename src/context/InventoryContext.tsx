@@ -68,10 +68,10 @@ interface InventoryContextType {
   cars: Car[];
   sales: Sale[];
   loading: boolean;
-  addCar: (car: Omit<Car, 'car_id' | 'status' | 'sold_date'>) => void;
-  sellCar: (carId: number, sellPrice: number) => void;
-  deleteCar: (carId: number) => void;
-  updateCar: (carId: number, updatedFields: Partial<Car>) => void;
+  addCar: (car: Omit<Car, 'car_id' | 'status' | 'sold_date'>) => Promise<void>;
+  sellCar: (carId: number, sellPrice: number) => Promise<void>;
+  deleteCar: (carId: number) => Promise<void>;
+  updateCar: (carId: number, updatedFields: Partial<Car>) => Promise<void>;
   setCars: React.Dispatch<React.SetStateAction<Car[]>>;
 }
 
@@ -147,35 +147,90 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     loadProducts();
   }, []);
 
-  const addCar = (newCarFields: Omit<Car, 'car_id' | 'status' | 'sold_date'>) => {
-    const car: Car = {
-      ...newCarFields,
-      car_id: Date.now(),
-      status: 'Available',
-      sold_date: null,
-    };
-    setCars((prev) => [car, ...prev]);
+  const addCar = async (newCarFields: Omit<Car, 'car_id' | 'status' | 'sold_date'>) => {
+    try {
+      const savedCar = await apiCall('/products', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newCarFields,
+          status: 'Available',
+          sold_date: null,
+        }),
+      });
+      setCars((prev) => [savedCar, ...prev]);
+    } catch (error: any) {
+      console.error('Failed to add car to database:', error.message);
+      // Fallback to local state if backend API is not available
+      const fallbackCar: Car = {
+        ...newCarFields,
+        car_id: Date.now(),
+        status: 'Available',
+        sold_date: null,
+      };
+      setCars((prev) => [fallbackCar, ...prev]);
+    }
   };
 
-  const sellCar = (carId: number, sellPrice: number) => {
+  const sellCar = async (carId: number, sellPrice: number) => {
     const sellDate = new Date().toISOString().split('T')[0];
-    setCars((prev) =>
-      prev.map((c) =>
-        c.car_id === carId
-          ? { ...c, status: 'Sold', selling_price: sellPrice, sold_date: sellDate }
-          : c
-      )
-    );
+    try {
+      await apiCall(`/products/${carId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Sold',
+          selling_price: sellPrice,
+          sold_date: sellDate,
+        }),
+      });
+      setCars((prev) =>
+        prev.map((c) =>
+          c.car_id === carId
+            ? { ...c, status: 'Sold', selling_price: sellPrice, sold_date: sellDate }
+            : c
+        )
+      );
+    } catch (error: any) {
+      console.error('Failed to sell car in database:', error.message);
+      // Fallback
+      setCars((prev) =>
+        prev.map((c) =>
+          c.car_id === carId
+            ? { ...c, status: 'Sold', selling_price: sellPrice, sold_date: sellDate }
+            : c
+        )
+      );
+    }
   };
 
-  const deleteCar = (carId: number) => {
-    setCars((prev) => prev.filter((c) => c.car_id !== carId));
+  const deleteCar = async (carId: number) => {
+    try {
+      await apiCall(`/products/${carId}`, {
+        method: 'DELETE',
+      });
+      setCars((prev) => prev.filter((c) => c.car_id !== carId));
+    } catch (error: any) {
+      console.error('Failed to delete car from database:', error.message);
+      // Fallback
+      setCars((prev) => prev.filter((c) => c.car_id !== carId));
+    }
   };
 
-  const updateCar = (carId: number, updatedFields: Partial<Car>) => {
-    setCars((prev) =>
-      prev.map((c) => (c.car_id === carId ? { ...c, ...updatedFields } : c))
-    );
+  const updateCar = async (carId: number, updatedFields: Partial<Car>) => {
+    try {
+      await apiCall(`/products/${carId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updatedFields),
+      });
+      setCars((prev) =>
+        prev.map((c) => (c.car_id === carId ? { ...c, ...updatedFields } : c))
+      );
+    } catch (error: any) {
+      console.error('Failed to update car in database:', error.message);
+      // Fallback
+      setCars((prev) =>
+        prev.map((c) => (c.car_id === carId ? { ...c, ...updatedFields } : c))
+      );
+    }
   };
 
   return (

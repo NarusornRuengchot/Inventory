@@ -57,15 +57,100 @@ function authToken(req, res, next) {
 }
 
 // Get products endpoint (Slide 15 + Slide 22)
-// NOTE: If you are NOT using login/register in your frontend yet (Slide 26),
-// you can remove `authToken` middleware from the parameters of this route (e.g. app.get('/api/products', async(req, res) => ...))
-app.get('/api/products', authToken, async (req, res) => {
+// NOTE: Exposing publicly since frontend has no login/token system yet.
+app.get('/api/products', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM used_car_inventory ORDER BY updated_at DESC');
     res.json(rows);
   } catch (e) {
     console.error('Products Error:', e.message);
     res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+// Add new product
+app.post('/api/products', async (req, res) => {
+  try {
+    const {
+      vin, license_plate, brand, model, model_year, color, mileage,
+      transmission, fuel_type, purchase_price, selling_price, status,
+      purchase_date, sold_date, notes, image_url, image_emoji
+    } = req.body;
+
+    const query = `
+      INSERT INTO used_car_inventory (
+        vin, license_plate, brand, model, model_year, color, mileage,
+        transmission, fuel_type, purchase_price, selling_price, status,
+        purchase_date, sold_date, notes, image_url, image_emoji
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const [result] = await pool.query(query, [
+      vin, license_plate, brand, model, model_year, color, mileage,
+      transmission, fuel_type, purchase_price, selling_price, status || 'Available',
+      purchase_date, sold_date || null, notes || null, image_url || null, image_emoji || null
+    ]);
+
+    const newCar = {
+      car_id: result.insertId,
+      vin, license_plate, brand, model, model_year, color, mileage,
+      transmission, fuel_type, purchase_price, selling_price, status: status || 'Available',
+      purchase_date, sold_date: sold_date || null, notes: notes || null,
+      image_url: image_url || null, image_emoji: image_emoji || null
+    };
+
+    res.status(201).json(newCar);
+  } catch (e) {
+    console.error('Add Product Error:', e.message);
+    res.status(500).json({ error: 'Failed to add product' });
+  }
+});
+
+// Update product partially
+app.patch('/api/products/:id', async (req, res) => {
+  const carId = req.params.id;
+  const updates = req.body;
+  if (!updates || Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  try {
+    const fields = [];
+    const values = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === 'car_id' || key === 'id' || key === 'created_at' || key === 'updated_at') continue;
+      fields.push(`${key} = ?`);
+      values.push(value);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    values.push(carId);
+    const query = `UPDATE used_car_inventory SET ${fields.join(', ')} WHERE car_id = ?`;
+    await pool.query(query, values);
+
+    res.json({ success: true, message: 'Product updated successfully' });
+  } catch (e) {
+    console.error('Update Product Error:', e.message);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// Delete product
+app.delete('/api/products/:id', async (req, res) => {
+  const carId = req.params.id;
+  try {
+    const [result] = await pool.query('DELETE FROM used_car_inventory WHERE car_id = ?', [carId]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ success: true, message: 'Product deleted successfully' });
+  } catch (e) {
+    console.error('Delete Product Error:', e.message);
+    res.status(500).json({ error: 'Failed to delete product' });
   }
 });
 
