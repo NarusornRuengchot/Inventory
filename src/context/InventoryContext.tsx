@@ -1,5 +1,4 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 
 export interface Car {
   car_id: number;
@@ -34,16 +33,14 @@ export interface Sale {
   sellDate: string;
 }
 
-const PRODUCTS_URL = 'https://raw.githubusercontent.com/NarusornRuengchot/Inventory/refs/heads/master/products.json';
 
-// Slide 27: Don't forget to declare the URL variable.
-// Please replace 3012 with your assigned backend port (e.g. from slide 13)
+
 const API_BASE_URL = 'http://119.59.102.161:3024/api';
 
-// Slide 23: If you have a login/authentication system, you can store and use the token here
+
 const authToken: string | null = null;
 
-// Slide 23: Enhanced API Call Function with better error handling for cloud
+
 const apiCall = async (endpoint: string, options: any = {}) => {
   const config = {
     ...options,
