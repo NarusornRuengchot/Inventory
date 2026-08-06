@@ -120,7 +120,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           vin: fetchedCar.vin || 'VIN_UNKNOWN_' + fetchedId,
           license_plate: fetchedCar.license_plate || (fetchedCar as any).location || 'PLATE_UNKNOWN',
           brand: fetchedCar.brand || 'Unknown',
-          model: fetchedCar.model || fetchedCar.name || 'Unknown',
+          model: fetchedCar.model || (fetchedCar as any).name || 'Unknown',
           model_year: fetchedCar.model_year || 2023,
           color: fetchedCar.color || 'Unknown',
           mileage: fetchedCar.mileage || 10000,

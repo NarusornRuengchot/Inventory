@@ -57,8 +57,8 @@ function authToken(req, res, next) {
 }
 
 // Get products endpoint (Slide 15 + Slide 22)
-// NOTE: Exposing publicly since frontend has no login/token system yet.
-app.get('/api/products', authToken, async (req, res) => {
+// NOTE: No auth middleware — frontend has no login/token system yet.
+app.get('/api/products', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM used_car_inventory ORDER BY updated_at DESC');
     res.json(rows);

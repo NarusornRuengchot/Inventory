@@ -25,8 +25,8 @@ export default function HomeScreen() {
   const availableCars = cars.filter((c) => c.status === 'Available');
   const soldCars = cars.filter((c) => c.status === 'Sold');
 
-  const totalValueAvailable = availableCars.reduce((sum, c) => sum + c.selling_price, 0);
-  const totalRevenue = sales.reduce((sum, s) => sum + s.sellPrice, 0);
+  const totalValueAvailable = availableCars.reduce((sum, c) => sum + Number(c.selling_price), 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + Number(s.sellPrice), 0);
 
   const themeStyles = {
     container: isDark ? styles.darkContainer : styles.lightContainer,
@@ -62,7 +62,7 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.statLabel}>Total Sales</Text>
             <Text style={[styles.statValue, { color: '#2E7D32' }]}>
-              ${totalRevenue.toLocaleString()}
+              ฿{totalRevenue.toLocaleString('th-TH')}
             </Text>
             <Text style={styles.statSub}>{sales.length} Deals Completed</Text>
           </View>
@@ -74,7 +74,7 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.statLabel}>Active Value</Text>
             <Text style={[styles.statValue, { color: '#8B5CF6' }]}>
-              ${totalValueAvailable.toLocaleString()}
+              ฿{totalValueAvailable.toLocaleString('th-TH')}
             </Text>
             <Text style={styles.statSub}>{availableCars.length} Cars Listed</Text>
           </View>
@@ -146,7 +146,7 @@ export default function HomeScreen() {
                   <Text style={[styles.saleCarName, { color: themeStyles.text }]}>{sale.carName}</Text>
                   <Text style={styles.saleDate}>{sale.sellDate}</Text>
                 </View>
-                <Text style={styles.saleAmount}>+${sale.sellPrice.toLocaleString()}</Text>
+                <Text style={styles.saleAmount}>+฿{Number(sale.sellPrice).toLocaleString('th-TH')}</Text>
               </View>
             ))}
           </View>

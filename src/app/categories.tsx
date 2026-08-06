@@ -24,7 +24,7 @@ export default function CategoriesScreen() {
       acc[car.brand] = { count: 0, totalValue: 0, available: 0, sold: 0, emoji: car.image_emoji || '🚗' };
     }
     acc[car.brand].count += 1;
-    acc[car.brand].totalValue += car.selling_price;
+    acc[car.brand].totalValue += Number(car.selling_price);
     if (car.status === 'Available') {
       acc[car.brand].available += 1;
     } else if (car.status === 'Sold') {
@@ -40,7 +40,7 @@ export default function CategoriesScreen() {
       acc[category] = { count: 0, totalValue: 0, available: 0, sold: 0 };
     }
     acc[category].count += 1;
-    acc[category].totalValue += car.selling_price;
+    acc[category].totalValue += Number(car.selling_price);
     if (car.status === 'Available') {
       acc[category].available += 1;
     } else if (car.status === 'Sold') {
@@ -95,7 +95,7 @@ export default function CategoriesScreen() {
 
               <View style={styles.valueRow}>
                 <Text style={styles.valueLabel}>Listed Value</Text>
-                <Text style={styles.valueText}>${stat.totalValue.toLocaleString()}</Text>
+                <Text style={styles.valueText}>฿{stat.totalValue.toLocaleString('th-TH')}</Text>
               </View>
             </View>
           ))}
@@ -126,7 +126,7 @@ export default function CategoriesScreen() {
                     {stat.available} Available / {stat.sold} Sold
                   </Text>
                   <Text style={[styles.typeFooterValText, { color: themeStyles.text }]}>
-                    ${stat.totalValue.toLocaleString()}
+                    ฿{stat.totalValue.toLocaleString('th-TH')}
                   </Text>
                 </View>
               </View>

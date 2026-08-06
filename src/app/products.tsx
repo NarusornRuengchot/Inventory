@@ -43,7 +43,7 @@ function deriveProductFromCar(car: Car): Product {
   const carId = car.car_id || (car as any).id || Math.floor(Math.random() * 100000);
   return {
     id: carId.toString(),
-    name: `${car.brand || 'Unknown'} ${car.model || car.name || 'Model'} (${car.model_year || 2023})`,
+    name: `${car.brand || 'Unknown'} ${car.model || 'Model'} (${car.model_year || 2023})`,
     stock_text: car.status === 'Available' ? 'Ready' : car.status || 'Unknown',
     category: `${car.fuel_type || 'Gasoline'} / ${car.transmission || 'Auto'}`,
     location_text: car.license_plate || (car as any).location || 'Unknown',
@@ -71,6 +71,10 @@ export default function ProductsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
 
+  // State for Detail Modal
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [detailCar, setDetailCar] = useState<Car | null>(null);
+
   // Edit fields
   const [editBrand, setEditBrand] = useState('');
   const [editModel, setEditModel] = useState('');
@@ -85,6 +89,8 @@ export default function ProductsScreen() {
   const [editSellingPrice, setEditSellingPrice] = useState('');
   const [editStatus, setEditStatus] = useState<Car['status']>('Available');
   const [editNotes, setEditNotes] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editImageUrlError, setEditImageUrlError] = useState(false);
 
   // Map all context cars to product schema
   const products = cars.map(deriveProductFromCar);
@@ -103,43 +109,12 @@ export default function ProductsScreen() {
   });
 
   const handleProductPress = (product: Product) => {
-    const car = product.originalCar;
-    const details = [
-      `VIN: ${car.vin}`,
-      `Plate: ${car.license_plate}`,
-      `Color: ${car.color}`,
-      `Mileage: ${car.mileage.toLocaleString()} km`,
-      `Transmission: ${car.transmission}`,
-      `Fuel Type: ${car.fuel_type}`,
-      `Purchase Cost: $${car.purchase_price.toLocaleString()}`,
-      `Selling Price: $${car.selling_price.toLocaleString()}`,
-      `Status: ${car.status}`,
-      `Purchase Date: ${car.purchase_date}`,
-    ];
-    if (car.status === 'Sold' && car.sold_date) {
-      details.push(`Sold Date: ${car.sold_date}`);
-    }
-    if (car.notes) {
-      details.push(`Notes: ${car.notes}`);
-    }
-
-    const buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Edit ✏️', onPress: () => handleOpenEditModal(car) },
-    ];
-    if (car.status !== 'Sold') {
-      buttons.push({ text: 'Sell 💰', onPress: () => handleOpenSellModal(car) });
-    }
-    buttons.push({ text: 'Delete 🗑️', style: 'destructive', onPress: () => handleDelete(car) });
-
-    customAlert(
-      `${car.brand} ${car.model} (${car.model_year})`,
-      details.join('\n'),
-      buttons
-    );
+    setDetailCar(product.originalCar);
+    setDetailModalVisible(true);
   };
 
   const handleOpenEditModal = (car: Car) => {
+    setDetailModalVisible(false);
     setEditingCar(car);
     setEditBrand(car.brand);
     setEditModel(car.model);
@@ -154,6 +129,8 @@ export default function ProductsScreen() {
     setEditSellingPrice(car.selling_price.toString());
     setEditStatus(car.status);
     setEditNotes(car.notes || '');
+    setEditImageUrl(car.image_url || '');
+    setEditImageUrlError(false);
     setEditModalVisible(true);
   };
 
@@ -193,6 +170,7 @@ export default function ProductsScreen() {
       selling_price: sellingVal,
       status: editStatus,
       notes: editNotes.trim() || null,
+      image_url: editImageUrl.trim() || undefined,
       sold_date: editStatus === 'Sold' ? (editingCar.sold_date || new Date().toISOString().split('T')[0]) : null,
     });
 
@@ -202,6 +180,7 @@ export default function ProductsScreen() {
   };
 
   const handleOpenSellModal = (car: Car) => {
+    setDetailModalVisible(false);
     setSelectedCar(car);
     setSellPriceInput(car.selling_price.toString());
     setSellModalVisible(true);
@@ -218,10 +197,11 @@ export default function ProductsScreen() {
     setSellModalVisible(false);
     setSelectedCar(null);
     setSellPriceInput('');
-    customAlert('Car Sold!', `${selectedCar.brand} ${selectedCar.model} sold for $${price.toLocaleString()}.`);
+    customAlert('Car Sold!', `${selectedCar.brand} ${selectedCar.model} sold for ฿${Number(price).toLocaleString('th-TH')}.`);
   };
 
   const handleDelete = (car: Car) => {
+    setDetailModalVisible(false);
     customAlert(
       'Delete Car',
       `Are you sure you want to remove this ${car.model_year} ${car.brand} ${car.model} from inventory?`,
@@ -272,6 +252,9 @@ export default function ProductsScreen() {
     inputBg: isDark ? '#2A2C30' : '#F0F0F3',
     inputText: isDark ? '#FFFFFF' : '#000000',
     headerBg: isDark ? '#161719' : '#FFFFFF',
+    modalBg: isDark ? '#1C1D20' : '#ffffff',
+    inputBorder: isDark ? '#2E3135' : '#ddd',
+    inputFieldBg: isDark ? '#2e3135' : '#fcfcfc',
   };
 
   return (
@@ -351,59 +334,66 @@ export default function ProductsScreen() {
               <TouchableOpacity
                 style={[styles.productCard, theme.cardBg, theme.border]}
                 onPress={() => handleProductPress(product)}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                {/* Left Side: Product Image & Name */}
-                <View style={styles.leftColumn}>
-                  <Image
-                    source={{ uri: product.image_url }}
-                    style={styles.productImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                  <Text style={[styles.productName, theme.text]} numberOfLines={2}>
-                    {product.name}
+                {/* Product Image */}
+                <Image
+                  source={{ uri: product.image_url }}
+                  style={styles.productImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+
+                {/* Status Badge overlaid on image */}
+                <View style={[styles.statusBadgeOverlay, { backgroundColor: badgeColors.bg }]}>
+                  <Text style={[styles.statusBadgeText, { color: badgeColors.text }]}>
+                    {product.badge_status}
                   </Text>
                 </View>
 
-                {/* Right Side: Details & Badge Status */}
-                <View style={styles.rightColumn}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>License:</Text>
-                    <Text style={[styles.detailValue, theme.text]}>{product.location_text}</Text>
-                  </View>
+                {/* Card Content */}
+                <View style={styles.cardContent}>
+                  <Text style={[styles.productName, theme.text]} numberOfLines={1}>
+                    {product.name}
+                  </Text>
 
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>Fuel/Gear:</Text>
+                  <View style={styles.cardDetailRow}>
+                    <Text style={[styles.detailLabel, theme.textSecondary]}>🪪</Text>
+                    <Text style={[styles.detailValue, theme.text]}>{product.location_text}</Text>
+                    <Text style={[styles.detailLabel, theme.textSecondary, { marginLeft: 8 }]}>⛽</Text>
                     <Text style={[styles.detailValue, theme.text]} numberOfLines={1}>{product.category}</Text>
                   </View>
 
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>Price:</Text>
-                    <Text style={[styles.detailValue, { color: '#8B5CF6', fontWeight: '800' }]}>
-                      ${product.originalCar.selling_price.toLocaleString()}
+                  <View style={styles.cardBottom}>
+                    <Text style={styles.priceText}>
+                    ฿{Number(product.originalCar.selling_price).toLocaleString('th-TH')}
                     </Text>
-                  </View>
 
-                  <View style={styles.badgeRow}>
-                    <View style={[
-                      styles.statusBadge,
-                      { backgroundColor: badgeColors.bg }
-                    ]}>
-                      <Text style={[
-                        styles.statusBadgeText,
-                        { color: badgeColors.text }
-                      ]}>
-                        {product.badge_status}
-                      </Text>
+                    {/* Quick Action Buttons */}
+                    <View style={styles.quickActions}>
+                      <TouchableOpacity
+                        style={[styles.quickActionBtn, styles.editBtn]}
+                        onPress={() => handleOpenEditModal(product.originalCar)}
+                      >
+                        <Text style={styles.quickActionText}>✏️</Text>
+                      </TouchableOpacity>
+
+                      {product.badge_status !== 'Sold' && (
+                        <TouchableOpacity
+                          style={[styles.quickActionBtn, styles.sellBtn]}
+                          onPress={() => handleOpenSellModal(product.originalCar)}
+                        >
+                          <Text style={styles.quickActionText}>💰</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={[styles.quickActionBtn, styles.deleteBtn]}
+                        onPress={() => handleDelete(product.originalCar)}
+                      >
+                        <Text style={styles.quickActionText}>🗑️</Text>
+                      </TouchableOpacity>
                     </View>
-
-                    <TouchableOpacity
-                      style={styles.arrowButton}
-                      onPress={() => handleProductPress(product)}
-                    >
-                      <Text style={styles.arrowButtonText}>›</Text>
-                    </TouchableOpacity>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -412,7 +402,90 @@ export default function ProductsScreen() {
         />
       )}
 
-      {/* Selling Modal */}
+      {/* ─── DETAIL MODAL ─── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={detailModalVisible}
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.modalBg }]}>
+            {detailCar && (
+              <>
+                {/* Car Image Preview */}
+                <Image
+                  source={{ uri: detailCar.image_url || getImageUrlForEmoji(detailCar.image_emoji || '') }}
+                  style={styles.detailModalImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+
+                <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333', marginTop: 12 }]}>
+                  {detailCar.model_year} {detailCar.brand} {detailCar.model}
+                </Text>
+
+                <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={{ gap: 6 }}>
+                  {[
+                    ['VIN', detailCar.vin],
+                    ['Plate', detailCar.license_plate],
+                    ['Color', detailCar.color],
+                    ['Mileage', `${detailCar.mileage.toLocaleString()} km`],
+                    ['Transmission', detailCar.transmission],
+                    ['Fuel Type', detailCar.fuel_type],
+                    ['Purchase Cost', `฿${Number(detailCar.purchase_price).toLocaleString('th-TH')}`],
+                    ['Selling Price', `฿${Number(detailCar.selling_price).toLocaleString('th-TH')}`],
+                    ['Status', detailCar.status],
+                    ['Purchase Date', detailCar.purchase_date],
+                    ...(detailCar.status === 'Sold' && detailCar.sold_date ? [['Sold Date', detailCar.sold_date]] : []),
+                    ...(detailCar.notes ? [['Notes', detailCar.notes]] : []),
+                  ].map(([label, value]) => (
+                    <View key={label} style={styles.detailInfoRow}>
+                      <Text style={[styles.detailInfoLabel, { color: isDark ? '#b0b4ba' : '#777' }]}>{label}</Text>
+                      <Text style={[styles.detailInfoValue, { color: isDark ? '#fff' : '#111' }]}>{value}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {/* Actions */}
+                <View style={styles.detailActions}>
+                  <TouchableOpacity
+                    style={[styles.detailActionBtn, { backgroundColor: isDark ? '#2e3135' : '#f0f0f0' }]}
+                    onPress={() => setDetailModalVisible(false)}
+                  >
+                    <Text style={{ color: isDark ? '#fff' : '#333', fontWeight: '700' }}>Close</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.detailActionBtn, { backgroundColor: '#3B82F6' }]}
+                    onPress={() => handleOpenEditModal(detailCar)}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>✏️ Edit</Text>
+                  </TouchableOpacity>
+
+                  {detailCar.status !== 'Sold' && (
+                    <TouchableOpacity
+                      style={[styles.detailActionBtn, { backgroundColor: '#10B981' }]}
+                      onPress={() => handleOpenSellModal(detailCar)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>💰 Sell</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.detailActionBtn, { backgroundColor: '#EF4444' }]}
+                    onPress={() => handleDelete(detailCar)}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── SELL MODAL ─── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -420,8 +493,8 @@ export default function ProductsScreen() {
         onRequestClose={() => setSellModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#212225' : '#ffffff' }]}>
-            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Record Car Sale</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.modalBg }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>💰 Record Car Sale</Text>
             {selectedCar && (
               <Text style={[styles.modalCarName, { color: isDark ? '#b0b4ba' : '#666' }]}>
                 {selectedCar.model_year} {selectedCar.brand} {selectedCar.model}
@@ -432,9 +505,9 @@ export default function ProductsScreen() {
               <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Final Selling Price ($)</Text>
               <TextInput
                 style={[styles.modalInput, {
-                  borderColor: isDark ? '#2E3135' : '#ddd',
+                  borderColor: theme.inputBorder,
                   color: isDark ? '#fff' : '#000',
-                  backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                  backgroundColor: theme.inputFieldBg
                 }]}
                 keyboardType="numeric"
                 value={sellPriceInput}
@@ -463,7 +536,7 @@ export default function ProductsScreen() {
         </View>
       </Modal>
 
-      {/* Editing Modal */}
+      {/* ─── EDIT MODAL ─── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -471,20 +544,59 @@ export default function ProductsScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, styles.modalContentLarge, { backgroundColor: isDark ? '#1C1D20' : '#ffffff' }]}>
-            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>Edit Car Details</Text>
+          <View style={[styles.modalContent, styles.modalContentLarge, { backgroundColor: theme.modalBg }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>✏️ Edit Car Details</Text>
 
             <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
+
+              {/* ── Image URL ── */}
+              <View style={styles.editSection}>
+                <Text style={styles.editSectionTitle}>📸 Photo</Text>
+              </View>
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Image URL (optional)</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: editImageUrlError ? '#EF4444' : theme.inputBorder,
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: theme.inputFieldBg,
+                  }]}
+                  value={editImageUrl}
+                  onChangeText={(t) => { setEditImageUrl(t); setEditImageUrlError(false); }}
+                  placeholder="https://example.com/car.jpg"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                {editImageUrl.trim() !== '' && (
+                  <View style={styles.editImagePreviewContainer}>
+                    <Image
+                      source={{ uri: editImageUrl.trim() }}
+                      style={styles.editImagePreview}
+                      contentFit="cover"
+                      transition={300}
+                      onError={() => setEditImageUrlError(true)}
+                    />
+                    {editImageUrlError && (
+                      <View style={styles.imageErrorOverlay}>
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>⚠️ Cannot load image</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* ── Vehicle Info ── */}
+              <View style={styles.editSection}>
+                <Text style={styles.editSectionTitle}>🚗 Vehicle Info</Text>
+              </View>
+
               {/* Brand & Model */}
               <View style={styles.flexRow}>
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Brand *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     value={editBrand}
                     onChangeText={setEditBrand}
                     placeholder="e.g. Toyota"
@@ -494,11 +606,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Model *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     value={editModel}
                     onChangeText={setEditModel}
                     placeholder="e.g. Camry"
@@ -512,11 +620,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Model Year *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     keyboardType="numeric"
                     value={editModelYear}
                     onChangeText={setEditModelYear}
@@ -527,11 +631,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Color *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     value={editColor}
                     onChangeText={setEditColor}
                     placeholder="e.g. Red"
@@ -545,11 +645,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 1.2 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>VIN *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     autoCapitalize="characters"
                     maxLength={17}
                     value={editVin}
@@ -561,11 +657,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 0.8 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Plate *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     value={editLicensePlate}
                     onChangeText={setEditLicensePlate}
                     placeholder="กข-1234"
@@ -574,16 +666,17 @@ export default function ProductsScreen() {
                 </View>
               </View>
 
+              {/* ── Specs ── */}
+              <View style={styles.editSection}>
+                <Text style={styles.editSectionTitle}>⚙️ Specifications</Text>
+              </View>
+
               {/* Mileage & Transmission */}
               <View style={styles.flexRow}>
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Mileage (km) *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     keyboardType="numeric"
                     value={editMileage}
                     onChangeText={setEditMileage}
@@ -638,16 +731,17 @@ export default function ProductsScreen() {
                 </View>
               </View>
 
+              {/* ── Pricing ── */}
+              <View style={styles.editSection}>
+                <Text style={styles.editSectionTitle}>💰 Pricing & Status</Text>
+              </View>
+
               {/* Purchase & Selling Prices */}
               <View style={styles.flexRow}>
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Purchase Price ($) *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     keyboardType="numeric"
                     value={editPurchasePrice}
                     onChangeText={setEditPurchasePrice}
@@ -658,11 +752,7 @@ export default function ProductsScreen() {
                 <View style={[styles.modalInputGroup, { flex: 1 }]}>
                   <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Selling Price ($) *</Text>
                   <TextInput
-                    style={[styles.modalInput, {
-                      borderColor: isDark ? '#2E3135' : '#ddd',
-                      color: isDark ? '#fff' : '#000',
-                      backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
-                    }]}
+                    style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     keyboardType="numeric"
                     value={editSellingPrice}
                     onChangeText={setEditSellingPrice}
@@ -701,9 +791,9 @@ export default function ProductsScreen() {
                 <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Notes</Text>
                 <TextInput
                   style={[styles.modalInput, styles.modalInputTextarea, {
-                    borderColor: isDark ? '#2E3135' : '#ddd',
+                    borderColor: theme.inputBorder,
                     color: isDark ? '#fff' : '#000',
-                    backgroundColor: isDark ? '#2e3135' : '#fcfcfc'
+                    backgroundColor: theme.inputFieldBg
                   }]}
                   multiline={true}
                   numberOfLines={3}
@@ -753,6 +843,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 100,
   },
   header: {
@@ -842,15 +933,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  // Product Card - new vertical layout
   productCard: {
-    flexDirection: 'row',
     borderRadius: 16,
-    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
@@ -878,31 +969,36 @@ const styles = StyleSheet.create({
   darkTextSecondary: {
     color: '#B0B4BA',
   },
-  leftColumn: {
-    flex: 1,
-    gap: 10,
-  },
   productImage: {
     width: '100%',
-    height: 100,
-    borderRadius: 12,
+    height: 160,
     backgroundColor: '#EAEAEA',
+  },
+  statusBadgeOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  cardContent: {
+    padding: 14,
+    gap: 6,
   },
   productName: {
     fontSize: 15,
     fontWeight: '700',
-    lineHeight: 20,
   },
-  rightColumn: {
-    flex: 1,
-    paddingLeft: 16,
-    justifyContent: 'space-between',
-  },
-  detailRow: {
+  cardDetailRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 4,
   },
   detailLabel: {
     fontSize: 12,
@@ -912,40 +1008,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  badgeRow: {
+  cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+  priceText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#8B5CF6',
   },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  quickActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  arrowButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F0F0F3',
+  quickActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  arrowButtonText: {
+  editBtn: {
+    backgroundColor: 'rgba(59,130,246,0.15)',
+  },
+  sellBtn: {
+    backgroundColor: 'rgba(16,185,129,0.15)',
+  },
+  deleteBtn: {
+    backgroundColor: 'rgba(239,68,68,0.15)',
+  },
+  quickActionText: {
     fontSize: 16,
-    color: '#8B5CF6',
-    fontWeight: '800',
-    marginTop: -2,
   },
   emptyText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Detail Modal
+  detailModalImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#EAEAEA',
+  },
+  detailInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  detailInfoLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  detailInfoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: '60%',
+    textAlign: 'right',
+  },
+  detailActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
+  detailActionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Modal Styles
   modalOverlay: {
@@ -960,7 +1095,7 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
   },
   modalContentLarge: {
-    height: '85%',
+    height: '90%',
   },
   modalTitle: {
     fontSize: 20,
@@ -1044,5 +1179,41 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  // Edit modal image preview
+  editImagePreviewContainer: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  editImagePreview: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#EAEAEA',
+  },
+  imageErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Edit section headers
+  editSection: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(139,92,246,0.2)',
+    paddingBottom: 4,
+    marginBottom: 4,
+  },
+  editSectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8B5CF6',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

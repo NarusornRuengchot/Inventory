@@ -11,6 +11,7 @@ import {
   useColorScheme,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { customAlert } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import { useInventory, Car } from '@/context/InventoryContext';
@@ -55,6 +56,8 @@ export default function AddScreen() {
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🚗');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrlError, setImageUrlError] = useState(false);
 
   // Auto-map emoji when brand changes
   const handleBrandChange = (text: string) => {
@@ -130,7 +133,8 @@ export default function AddScreen() {
       selling_price: sellingVal,
       purchase_date: purchaseDate.trim(),
       notes: notes.trim() || null,
-      image_emoji: selectedEmoji,
+      image_emoji: imageUrl.trim() ? undefined : selectedEmoji,
+      image_url: imageUrl.trim() || undefined,
     });
 
     customAlert(
@@ -155,6 +159,8 @@ export default function AddScreen() {
             setPurchaseDate(new Date().toISOString().split('T')[0]);
             setNotes('');
             setSelectedEmoji('🚗');
+            setImageUrl('');
+            setImageUrlError(false);
             
             router.push('/products');
           },
@@ -170,7 +176,14 @@ export default function AddScreen() {
     inputBg: isDark ? '#2E3135' : '#ffffff',
     inputText: isDark ? '#ffffff' : '#000000',
     inputBorder: isDark ? '#3E4249' : '#ddd',
+    labelColor: isDark ? '#b0b4ba' : '#444',
   };
+
+  const inputStyle = [styles.input, { 
+    borderColor: themeStyles.inputBorder,
+    color: themeStyles.inputText,
+    backgroundColor: themeStyles.inputBg
+  }];
 
   return (
     <SafeAreaView style={[styles.container, themeStyles.container]}>
@@ -181,18 +194,82 @@ export default function AddScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.formContainer, themeStyles.cardBg, themeStyles.border]}>
-          <Text style={[styles.formTitle, { color: isDark ? '#fff' : '#111' }]}>Add Vehicle to Stock</Text>
-          
+          <Text style={[styles.formTitle, { color: isDark ? '#fff' : '#111' }]}>🚘 Add Vehicle to Stock</Text>
+
+          {/* ─── IMAGE URL SECTION ─── */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>📸 Vehicle Photo</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Image URL (optional)</Text>
+            <TextInput
+              style={[
+                inputStyle,
+                imageUrlError && styles.inputError,
+              ]}
+              placeholder="https://example.com/car-photo.jpg"
+              placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+              value={imageUrl}
+              onChangeText={(text) => {
+                setImageUrl(text);
+                setImageUrlError(false);
+              }}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+            {imageUrl.trim() !== '' && (
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: imageUrl.trim() }}
+                  style={styles.imagePreview}
+                  contentFit="cover"
+                  transition={300}
+                  onError={() => setImageUrlError(true)}
+                />
+                {imageUrlError && (
+                  <View style={styles.imageErrorOverlay}>
+                    <Text style={styles.imageErrorText}>⚠️ Cannot load image</Text>
+                    <Text style={styles.imageErrorSubText}>Check URL and try again</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Visual Emoji Badge (shown only if no image_url) */}
+          {!imageUrl.trim() && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Visual Badge Icon</Text>
+              <View style={styles.emojiRow}>
+                {['🚗', '⚡', '🏁', '🏎️', '🔋', '⛰️', '🇯🇵', '🇩🇪', '🇺🇸'].map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={[
+                      styles.emojiSelectorChip,
+                      selectedEmoji === emoji && styles.activeEmojiChip,
+                      selectedEmoji !== emoji && { backgroundColor: isDark ? '#2E3135' : '#f0f0f3' }
+                    ]}
+                    onPress={() => setSelectedEmoji(emoji)}
+                  >
+                    <Text style={styles.emojiSelectorText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ─── VEHICLE INFO ─── */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>🚗 Vehicle Info</Text>
+          </View>
+
           {/* Brand & Model */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Brand / Make *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Brand / Make *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 placeholder="e.g. Toyota"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 value={brand}
@@ -201,13 +278,9 @@ export default function AddScreen() {
             </View>
 
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Model *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Model *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 placeholder="e.g. Camry"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 value={model}
@@ -219,13 +292,9 @@ export default function AddScreen() {
           {/* Model Year & Color */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Model Year *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Model Year *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 keyboardType="numeric"
                 placeholder="2022"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
@@ -235,13 +304,9 @@ export default function AddScreen() {
             </View>
 
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Color *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Color *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 placeholder="e.g. White"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 value={color}
@@ -253,13 +318,9 @@ export default function AddScreen() {
           {/* VIN & License Plate */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1.3 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>VIN (17 chars) *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>VIN (17 chars) *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 autoCapitalize="characters"
                 maxLength={17}
                 placeholder="Vehicle ID Number"
@@ -270,13 +331,9 @@ export default function AddScreen() {
             </View>
 
             <View style={[styles.inputGroup, { flex: 0.9, marginLeft: 12 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>License Plate *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>License Plate *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 placeholder="กข-1234"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 value={licensePlate}
@@ -285,16 +342,17 @@ export default function AddScreen() {
             </View>
           </View>
 
+          {/* ─── SPECS ─── */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>⚙️ Specifications</Text>
+          </View>
+
           {/* Mileage & Purchase Date */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Mileage (km) *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Mileage (km) *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 keyboardType="numeric"
                 placeholder="e.g. 25000"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
@@ -304,13 +362,9 @@ export default function AddScreen() {
             </View>
 
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Purchase Date *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Purchase Date *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
                 value={purchaseDate}
@@ -321,7 +375,7 @@ export default function AddScreen() {
 
           {/* Transmission Selection */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Transmission</Text>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Transmission</Text>
             <View style={styles.selectorRow}>
               {(['Auto', 'Manual'] as const).map((t) => (
                 <TouchableOpacity
@@ -344,7 +398,7 @@ export default function AddScreen() {
 
           {/* Fuel Type Selection */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Fuel Type</Text>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Fuel Type</Text>
             <View style={styles.selectorRow}>
               {(['Gasoline', 'Diesel', 'EV', 'Hybrid'] as const).map((f) => (
                 <TouchableOpacity
@@ -365,16 +419,17 @@ export default function AddScreen() {
             </View>
           </View>
 
+          {/* ─── PRICING ─── */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>💰 Pricing</Text>
+          </View>
+
           {/* Cost vs Selling Prices */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Purchase Price ($) *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Purchase Price ($) *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 keyboardType="numeric"
                 placeholder="Cost"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
@@ -384,13 +439,9 @@ export default function AddScreen() {
             </View>
 
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-              <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Selling Price ($) *</Text>
+              <Text style={[styles.label, { color: themeStyles.labelColor }]}>Selling Price ($) *</Text>
               <TextInput
-                style={[styles.input, { 
-                  borderColor: themeStyles.inputBorder,
-                  color: themeStyles.inputText,
-                  backgroundColor: themeStyles.inputBg
-                }]}
+                style={inputStyle}
                 keyboardType="numeric"
                 placeholder="Retail"
                 placeholderTextColor={isDark ? '#8a8e94' : '#999'}
@@ -402,13 +453,9 @@ export default function AddScreen() {
 
           {/* Notes */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Notes</Text>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Notes</Text>
             <TextInput
-              style={[styles.input, styles.textarea, { 
-                borderColor: themeStyles.inputBorder,
-                color: themeStyles.inputText,
-                backgroundColor: themeStyles.inputBg
-              }]}
+              style={[inputStyle, styles.textarea]}
               multiline={true}
               numberOfLines={3}
               placeholder="e.g. Pristine condition, warranty remaining..."
@@ -416,26 +463,6 @@ export default function AddScreen() {
               value={notes}
               onChangeText={setNotes}
             />
-          </View>
-
-          {/* Visual Emoji Chip */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#b0b4ba' : '#444' }]}>Visual Badge Icon</Text>
-            <View style={styles.emojiRow}>
-              {['🚗', '⚡', '🏁', '🏎️', '🔋', '⛰️', '🇯🇵', '🇩🇪', '🇺🇸'].map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.emojiSelectorChip,
-                    selectedEmoji === emoji && styles.activeEmojiChip,
-                    selectedEmoji !== emoji && { backgroundColor: isDark ? '#2E3135' : '#f0f0f3' }
-                  ]}
-                  onPress={() => setSelectedEmoji(emoji)}
-                >
-                  <Text style={styles.emojiSelectorText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           {/* Submit */}
@@ -491,6 +518,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.5,
   },
+  sectionHeader: {
+    marginBottom: 12,
+    marginTop: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(139,92,246,0.2)',
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   inputGroup: {
     marginBottom: 16,
   },
@@ -507,6 +547,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: '#EF4444',
   },
   textarea: {
     height: 80,
@@ -558,6 +601,38 @@ const styles = StyleSheet.create({
   },
   emojiSelectorText: {
     fontSize: 18,
+  },
+  imagePreviewContainer: {
+    marginTop: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#EAEAEA',
+  },
+  imageErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  imageErrorText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  imageErrorSubText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 4,
   },
   submitButton: {
     backgroundColor: '#8B5CF6',
