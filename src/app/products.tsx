@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Modal,
   SafeAreaView,
@@ -17,6 +18,11 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Car, useInventory } from '@/context/InventoryContext';
 import { customAlert } from '@/utils/alert';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_MARGIN = 8;
+const NUM_COLUMNS = 2;
+const CARD_WIDTH = (SCREEN_WIDTH - 32 - CARD_MARGIN * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
 interface Product {
   id: string;
@@ -326,7 +332,9 @@ export default function ProductsScreen() {
         <FlatList
           data={filteredProducts}
           keyExtractor={(product) => product.id}
+          numColumns={NUM_COLUMNS}
           contentContainerStyle={styles.scrollContent}
+          columnWrapperStyle={styles.columnWrapper}
           renderItem={({ item: product }) => {
             const badgeColors = getStatusBadgeStyle(product.badge_status);
 
@@ -334,41 +342,49 @@ export default function ProductsScreen() {
               <TouchableOpacity
                 style={[styles.productCard, theme.cardBg, theme.border]}
                 onPress={() => handleProductPress(product)}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
               >
                 {/* Product Image */}
-                <Image
-                  source={{ uri: product.image_url }}
-                  style={styles.productImage}
-                  contentFit="cover"
-                  transition={200}
-                />
+                <View style={styles.productImageContainer}>
+                  <Image
+                    source={{ uri: product.image_url }}
+                    style={styles.productImage}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                  {/* Gradient overlay at bottom of image */}
+                  <View style={styles.imageGradient} />
 
-                {/* Status Badge overlaid on image */}
-                <View style={[styles.statusBadgeOverlay, { backgroundColor: badgeColors.bg }]}>
-                  <Text style={[styles.statusBadgeText, { color: badgeColors.text }]}>
-                    {product.badge_status}
+                  {/* Status Badge */}
+                  <View style={[styles.statusBadgeOverlay, { backgroundColor: badgeColors.bg }]}>
+                    <Text style={[styles.statusBadgeText, { color: badgeColors.text }]}>
+                      {product.badge_status}
+                    </Text>
+                  </View>
+
+                  {/* Price overlaid on image bottom */}
+                  <Text style={styles.priceOverlay}>
+                    ฿{Number(product.originalCar.selling_price).toLocaleString('th-TH')}
                   </Text>
                 </View>
 
                 {/* Card Content */}
                 <View style={styles.cardContent}>
-                  <Text style={[styles.productName, theme.text]} numberOfLines={1}>
+                  <Text style={[styles.productName, theme.text]} numberOfLines={2}>
                     {product.name}
                   </Text>
 
                   <View style={styles.cardDetailRow}>
-                    <Text style={[styles.detailLabel, theme.textSecondary]}>🪪</Text>
-                    <Text style={[styles.detailValue, theme.text]}>{product.location_text}</Text>
-                    <Text style={[styles.detailLabel, theme.textSecondary, { marginLeft: 8 }]}>⛽</Text>
-                    <Text style={[styles.detailValue, theme.text]} numberOfLines={1}>{product.category}</Text>
+                    <Text style={[styles.detailChip, theme.textSecondary]}>
+                      ⛽ {product.originalCar.fuel_type}
+                    </Text>
+                    <Text style={[styles.detailChip, theme.textSecondary]}>
+                      ⚙️ {product.originalCar.transmission}
+                    </Text>
                   </View>
 
+                  {/* Action Row */}
                   <View style={styles.cardBottom}>
-                    <Text style={styles.priceText}>
-                    ฿{Number(product.originalCar.selling_price).toLocaleString('th-TH')}
-                    </Text>
-
                     {/* Quick Action Buttons */}
                     <View style={styles.quickActions}>
                       <TouchableOpacity
@@ -394,6 +410,14 @@ export default function ProductsScreen() {
                         <Text style={styles.quickActionText}>🗑️</Text>
                       </TouchableOpacity>
                     </View>
+
+                    {/* Detail button */}
+                    <TouchableOpacity
+                      style={styles.detailIconBtn}
+                      onPress={() => handleProductPress(product)}
+                    >
+                      <Text style={styles.detailIconText}>👁</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -401,6 +425,7 @@ export default function ProductsScreen() {
           }}
         />
       )}
+
 
       {/* ─── DETAIL MODAL ─── */}
       <Modal
@@ -411,79 +436,98 @@ export default function ProductsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.modalBg }]}>
-            {detailCar && (
-              <>
-                {/* Car Image Preview */}
-                <Image
-                  source={{ uri: detailCar.image_url || getImageUrlForEmoji(detailCar.image_emoji || '') }}
-                  style={styles.detailModalImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-
-                <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333', marginTop: 12 }]}>
-                  {detailCar.model_year} {detailCar.brand} {detailCar.model}
-                </Text>
-
-                <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={{ gap: 6 }}>
-                  {[
-                    ['VIN', detailCar.vin],
-                    ['Plate', detailCar.license_plate],
-                    ['Color', detailCar.color],
-                    ['Mileage', `${detailCar.mileage.toLocaleString()} km`],
-                    ['Transmission', detailCar.transmission],
-                    ['Fuel Type', detailCar.fuel_type],
-                    ['Purchase Cost', `฿${Number(detailCar.purchase_price).toLocaleString('th-TH')}`],
-                    ['Selling Price', `฿${Number(detailCar.selling_price).toLocaleString('th-TH')}`],
-                    ['Status', detailCar.status],
-                    ['Purchase Date', detailCar.purchase_date],
-                    ...(detailCar.status === 'Sold' && detailCar.sold_date ? [['Sold Date', detailCar.sold_date]] : []),
-                    ...(detailCar.notes ? [['Notes', detailCar.notes]] : []),
-                  ].map(([label, value]) => (
-                    <View key={label} style={styles.detailInfoRow}>
-                      <Text style={[styles.detailInfoLabel, { color: isDark ? '#b0b4ba' : '#777' }]}>{label}</Text>
-                      <Text style={[styles.detailInfoValue, { color: isDark ? '#fff' : '#111' }]}>{value}</Text>
+            {detailCar && (() => {
+              const badgeColors = getStatusBadgeStyle(detailCar.status);
+              return (
+                <>
+                  {/* Car Image Preview */}
+                  <View style={styles.detailImageWrapper}>
+                    <Image
+                      source={{ uri: detailCar.image_url || getImageUrlForEmoji(detailCar.image_emoji || '') }}
+                      style={styles.detailModalImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                    <View style={styles.detailImageGradient} />
+                    {/* Status badge on image */}
+                    <View style={[styles.detailStatusBadge, { backgroundColor: badgeColors.bg }]}>
+                      <Text style={[styles.detailStatusBadgeText, { color: badgeColors.text }]}>
+                        {detailCar.status}
+                      </Text>
                     </View>
-                  ))}
-                </ScrollView>
+                    {/* Price on image */}
+                    <Text style={styles.detailPriceOnImage}>
+                      ฿{Number(detailCar.selling_price).toLocaleString('th-TH')}
+                    </Text>
+                  </View>
 
-                {/* Actions */}
-                <View style={styles.detailActions}>
-                  <TouchableOpacity
-                    style={[styles.detailActionBtn, { backgroundColor: isDark ? '#2e3135' : '#f0f0f0' }]}
-                    onPress={() => setDetailModalVisible(false)}
-                  >
-                    <Text style={{ color: isDark ? '#fff' : '#333', fontWeight: '700' }}>Close</Text>
-                  </TouchableOpacity>
+                  {/* Car Title */}
+                  <Text style={[styles.detailCarTitle, { color: isDark ? '#fff' : '#111' }]}>
+                    {detailCar.model_year} {detailCar.brand} {detailCar.model}
+                  </Text>
+                  <Text style={[styles.detailPlateText, { color: isDark ? '#8A8E9A' : '#777E90' }]}>
+                    🪪 {detailCar.license_plate}  ·  🎨 {detailCar.color}
+                  </Text>
 
-                  <TouchableOpacity
-                    style={[styles.detailActionBtn, { backgroundColor: '#3B82F6' }]}
-                    onPress={() => handleOpenEditModal(detailCar)}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>✏️ Edit</Text>
-                  </TouchableOpacity>
+                  {/* Info Grid */}
+                  <ScrollView style={{ maxHeight: 200 }} contentContainerStyle={{ gap: 0 }}>
+                    {[
+                      ['VIN', detailCar.vin],
+                      ['Mileage', `${detailCar.mileage.toLocaleString()} km`],
+                      ['Transmission', detailCar.transmission],
+                      ['Fuel Type', detailCar.fuel_type],
+                      ['Purchase Cost', `฿${Number(detailCar.purchase_price).toLocaleString('th-TH')}`],
+                      ['Selling Price', `฿${Number(detailCar.selling_price).toLocaleString('th-TH')}`],
+                      ['Purchase Date', detailCar.purchase_date],
+                      ...(detailCar.status === 'Sold' && detailCar.sold_date ? [['Sold Date', detailCar.sold_date]] : []),
+                      ...(detailCar.notes ? [['Notes', detailCar.notes]] : []),
+                    ].map(([label, value]) => (
+                      <View key={label} style={[styles.detailInfoRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
+                        <Text style={[styles.detailInfoLabel, { color: isDark ? '#8A8E9A' : '#777E90' }]}>{label}</Text>
+                        <Text style={[styles.detailInfoValue, { color: isDark ? '#fff' : '#111' }]}>{value}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
 
-                  {detailCar.status !== 'Sold' && (
+                  {/* Actions */}
+                  <View style={styles.detailActions}>
                     <TouchableOpacity
-                      style={[styles.detailActionBtn, { backgroundColor: '#10B981' }]}
-                      onPress={() => handleOpenSellModal(detailCar)}
+                      style={[styles.detailActionBtn, { backgroundColor: isDark ? '#1E2028' : '#F0F2F8' }]}
+                      onPress={() => setDetailModalVisible(false)}
                     >
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>💰 Sell</Text>
+                      <Text style={{ color: isDark ? '#fff' : '#333', fontWeight: '700', fontSize: 13 }}>✕ Close</Text>
                     </TouchableOpacity>
-                  )}
 
-                  <TouchableOpacity
-                    style={[styles.detailActionBtn, { backgroundColor: '#EF4444' }]}
-                    onPress={() => handleDelete(detailCar)}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>🗑️</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+                    <TouchableOpacity
+                      style={[styles.detailActionBtn, { backgroundColor: '#3B82F6' }]}
+                      onPress={() => handleOpenEditModal(detailCar)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>✏️ Edit</Text>
+                    </TouchableOpacity>
+
+                    {detailCar.status !== 'Sold' && (
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, { backgroundColor: '#10B981' }]}
+                        onPress={() => handleOpenSellModal(detailCar)}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>💰 Sell</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.detailActionBtn, { backgroundColor: '#EF4444' }]}
+                      onPress={() => handleDelete(detailCar)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>
+
 
       {/* ─── SELL MODAL ─── */}
       <Modal
@@ -831,10 +875,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   lightContainer: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F0F2F8',
   },
   darkContainer: {
-    backgroundColor: '#000000',
+    backgroundColor: '#0A0B0E',
   },
   centerContainer: {
     flex: 1,
@@ -843,8 +887,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 100,
+  },
+  columnWrapper: {
+    gap: CARD_MARGIN,
+    marginBottom: CARD_MARGIN,
   },
   header: {
     height: 60,
@@ -933,29 +981,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  // Product Card - new vertical layout
+
+  // ── Grid Product Card ──
   productCard: {
-    borderRadius: 16,
-    marginBottom: 16,
+    width: CARD_WIDTH,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   lightCard: {
     backgroundColor: '#FFFFFF',
   },
   darkCard: {
-    backgroundColor: '#161719',
+    backgroundColor: '#16181E',
   },
   lightBorder: {
-    borderColor: '#E9ECEF',
+    borderColor: '#E4E8F0',
   },
   darkBorder: {
-    borderColor: '#212225',
+    borderColor: '#1E2028',
   },
   lightText: {
     color: '#111111',
@@ -964,42 +1013,82 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   lightTextSecondary: {
-    color: '#666666',
+    color: '#777E90',
   },
   darkTextSecondary: {
-    color: '#B0B4BA',
+    color: '#8A8E9A',
+  },
+
+  // Image area
+  productImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: CARD_WIDTH * 0.72,
   },
   productImage: {
     width: '100%',
-    height: 160,
+    height: '100%',
     backgroundColor: '#EAEAEA',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '55%',
+    backgroundColor: 'rgba(0,0,0,0.38)',
+  },
+  priceOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 10,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   statusBadgeOverlay: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    top: 8,
+    right: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     borderRadius: 20,
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '800',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
+
+  // Card body
   cardContent: {
-    padding: 14,
+    padding: 10,
     gap: 6,
   },
   productName: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
+    lineHeight: 17,
   },
   cardDetailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap',
   },
+  detailChip: {
+    fontSize: 10,
+    fontWeight: '600',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(139,92,246,0.08)',
+    overflow: 'hidden',
+  },
+  // legacy (kept for backward compat)
   detailLabel: {
     fontSize: 12,
     fontWeight: '500',
@@ -1012,45 +1101,108 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: '#8B5CF6',
   },
   quickActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 5,
   },
   quickActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   editBtn: {
-    backgroundColor: 'rgba(59,130,246,0.15)',
+    backgroundColor: 'rgba(59,130,246,0.13)',
   },
   sellBtn: {
-    backgroundColor: 'rgba(16,185,129,0.15)',
+    backgroundColor: 'rgba(16,185,129,0.13)',
   },
   deleteBtn: {
-    backgroundColor: 'rgba(239,68,68,0.15)',
+    backgroundColor: 'rgba(239,68,68,0.13)',
   },
   quickActionText: {
-    fontSize: 16,
+    fontSize: 13,
+  },
+  detailIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(139,92,246,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailIconText: {
+    fontSize: 14,
   },
   emptyText: {
     fontSize: 15,
     fontWeight: '600',
   },
-  // Detail Modal
-  detailModalImage: {
+
+  // ── Detail Modal ──
+  detailImageWrapper: {
+    position: 'relative',
     width: '100%',
     height: 180,
-    borderRadius: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
+  detailImageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  detailStatusBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+  },
+  detailStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailPriceOnImage: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  detailCarTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: 12,
+    marginBottom: 2,
+  },
+  detailPlateText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  detailModalImage: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#EAEAEA',
   },
   detailInfoRow: {
@@ -1082,7 +1234,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Modal Styles
+
+  // ── Modal Styles ──
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1217,3 +1370,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+
