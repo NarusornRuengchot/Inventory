@@ -1,4 +1,5 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 export interface Car {
   car_id: number;
@@ -37,17 +38,13 @@ export interface Sale {
 
 const API_BASE_URL = 'http://119.59.102.161:3024/api';
 
-
-const authToken: string | null = null;
-
-
-const apiCall = async (endpoint: string, options: any = {}) => {
+const makeApiCall = async (endpoint: string, token: string | null, options: any = {}) => {
   const config = {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   };
@@ -77,6 +74,11 @@ const InventoryContext = createContext<InventoryContextType | undefined>(undefin
 export const initialCars: Car[] = [];
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
+
+  // Shorthand to call API with current auth token
+  const apiCall = (endpoint: string, options: any = {}) =>
+    makeApiCall(endpoint, token, options);
   const [loading, setLoading] = useState(true);
   const [cars, setCars] = useState<Car[]>([]);
 
@@ -91,28 +93,24 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       sellDate: car.sold_date || new Date().toISOString().split('T')[0],
     }));
 
-  // Fetch/sync products on mount
+  // Fetch/sync products on mount and when token changes (login/logout)
   useEffect(() => {
     async function loadProducts() {
       let fetchedData: Car[] = [];
-      let success = false;
 
-      // Step 1: Try fetching from our cloud DB (Node.js backend)
+      // Try fetching from cloud DB API
       try {
         console.log('Fetching products from cloud DB API:', `${API_BASE_URL}/products`);
         const data = await apiCall('/products');
         if (Array.isArray(data)) {
           fetchedData = data;
-          success = true;
           console.log(`Loaded ${data.length} products from cloud DB`);
         }
       } catch (error: any) {
         console.warn('Could not fetch products from cloud DB API:', error.message);
       }
 
-
-
-      // Set state directly with the fetched database records
+      // Normalize fetched data
       const normalizedData = fetchedData.map((fetchedCar) => {
         const fetchedId = fetchedCar.car_id || (fetchedCar as any).id || Math.floor(Math.random() * 100000);
         return {
@@ -142,7 +140,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     loadProducts();
-  }, []);
+  }, [token]);
 
   const addCar = async (newCarFields: Omit<Car, 'car_id' | 'status' | 'sold_date'>) => {
     try {

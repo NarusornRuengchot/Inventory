@@ -17,9 +17,11 @@ import { ThemedView } from './themed-view';
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AppTabs() {
   const theme = useTheme();
+  const { isAdmin, user } = useAuth();
 
   return (
     <Tabs style={{ flex: 1, backgroundColor: theme.background }}>
@@ -33,14 +35,29 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="add" href="/add" asChild>
-            <TabButton>Add</TabButton>
-          </TabTrigger>
+          {/* Add — Admin only */}
+          {isAdmin && (
+            <TabTrigger name="add" href="/add" asChild>
+              <TabButton>Add</TabButton>
+            </TabTrigger>
+          )}
           <TabTrigger name="products" href="/products" asChild>
             <TabButton>Products</TabButton>
           </TabTrigger>
           <TabTrigger name="categories" href="/categories" asChild>
             <TabButton>Categories</TabButton>
+          </TabTrigger>
+
+          {/* Login tab — แสดงเมื่อยังไม่ login เพื่อให้ Expo TabSlot รู้จักเส้นทาง */}
+          {!user && (
+            <TabTrigger name="login" href="/login" asChild>
+              <TabButton>🔑 Login</TabButton>
+            </TabTrigger>
+          )}
+
+          {/* Register tab trigger ซ่อนไว้เพื่อให้ Slot route ได้ */}
+          <TabTrigger name="register" href="/register" asChild style={{ display: 'none' }}>
+            <TabButton>Register</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -69,6 +86,7 @@ export function WebFooterNav() {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const { colorScheme, setThemeMode } = useThemeMode();
+  const { isAdmin, user, logout } = useAuth();
   const isNarrow = width < 600;
   
   const getButtonType = (routePath: string) => {
@@ -104,13 +122,16 @@ export function WebFooterNav() {
           </Pressable>
         </Link>
 
-        <Link href="/add" asChild>
-          <Pressable style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView type={getButtonType('/add')} style={styles.tabButtonView}>
-              <ThemedText type="small" themeColor={getTextColor('/add')}>Add</ThemedText>
-            </ThemedView>
-          </Pressable>
-        </Link>
+        {/* Add — Admin only */}
+        {isAdmin && (
+          <Link href="/add" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type={getButtonType('/add')} style={styles.tabButtonView}>
+                <ThemedText type="small" themeColor={getTextColor('/add')}>Add</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Link>
+        )}
 
         <Link href="/products" asChild>
           <Pressable style={({ pressed }) => pressed && styles.pressed}>
@@ -139,6 +160,35 @@ export function WebFooterNav() {
             </ThemedText>
           </ThemedView>
         </Pressable>
+
+        {/* Login Tab if not logged in */}
+        {!user && (
+          <Link href="/login" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type={getButtonType('/login')} style={styles.tabButtonView}>
+                <ThemedText type="small" themeColor={getTextColor('/login')}>🔑 Login</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Link>
+        )}
+
+        {/* User Info + Logout */}
+        {user && (
+          <>
+            {!isNarrow && (
+              <ThemedText type="small" themeColor="textSecondary" style={{ marginLeft: 4 }}>
+                {user.role === 'admin' ? '👑' : '👤'} {user.username}
+              </ThemedText>
+            )}
+            <TouchableOpacity
+              id="footer-logout-button"
+              onPress={logout}
+              style={styles.logoutButton}
+            >
+              <ThemedText type="small" style={{ color: '#ef4444', fontWeight: '600' }}>Logout</ThemedText>
+            </TouchableOpacity>
+          </>
+        )}
       </ThemedView>
     </View>
   );
@@ -153,6 +203,7 @@ export function CustomTabList({ position = 'top', ...props }: CustomTabListProps
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
   const { width } = useWindowDimensions();
   const { colorScheme, setThemeMode } = useThemeMode();
+  const { user, logout } = useAuth();
   const isNarrow = width < 600;
   
   const containerStyle = position === 'bottom' ? styles.tabListContainerBottom : styles.tabListContainerTop;
@@ -196,6 +247,24 @@ export function CustomTabList({ position = 'top', ...props }: CustomTabListProps
                 />
               </Pressable>
             </ExternalLink>
+
+            {/* User Info */}
+            {user && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {user.role === 'admin' ? '👑' : '👤'} {user.username}
+              </ThemedText>
+            )}
+
+            {/* Logout Button */}
+            {user && (
+              <TouchableOpacity
+                id="top-logout-button"
+                onPress={logout}
+                style={[styles.externalPressable, styles.logoutButtonTop]}
+              >
+                <ThemedText type="small" style={{ color: '#ef4444', fontWeight: '600' }}>Logout</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ThemedView>
@@ -214,43 +283,42 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    padding: Spacing.three,
-    justifyContent: 'center',
+    zIndex: 100,
     alignItems: 'center',
-    flexDirection: 'row',
-    zIndex: 1000,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
   },
   tabListContainerBottom: {
     position: 'fixed',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: Spacing.three,
-    justifyContent: 'center',
+    zIndex: 100,
     alignItems: 'center',
-    flexDirection: 'row',
-    zIndex: 1000,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.three,
   },
   innerContainer: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
-    flexGrow: 1,
     gap: Spacing.two,
+    padding: Spacing.two,
+    borderRadius: Spacing.four,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
     maxWidth: MaxContentWidth,
+    flexWrap: 'wrap',
   },
   brandText: {
-    marginRight: 'auto',
+    marginRight: Spacing.two,
+    marginLeft: Spacing.one,
+  },
+  tabButtonView: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.three,
   },
   pressed: {
     opacity: 0.7,
-  },
-  tabButtonView: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
   },
   externalPressable: {
     flexDirection: 'row',
@@ -258,5 +326,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     marginLeft: Spacing.three,
+  },
+  logoutButton: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  logoutButtonTop: {
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#ef4444',
   },
 });

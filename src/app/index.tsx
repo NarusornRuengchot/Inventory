@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useInventory } from '@/context/InventoryContext';
 import { TopNavigation } from '@/components/top-navigation';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function HomeScreen() {
   const isDark = colorScheme === 'dark';
   
   const { cars, sales } = useInventory();
+  const { user, isAdmin } = useAuth();
 
   // Calculations for dashboard metrics
   const availableCars = cars.filter((c) => c.status === 'Available');
@@ -47,7 +49,38 @@ export default function HomeScreen() {
         
         {/* Welcome Section */}
         <View style={styles.welcomeRow}>
-          <Text style={[styles.welcomeTitle, { color: themeStyles.text }]}>Hello Dealer 👋</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={[styles.welcomeTitle, { color: themeStyles.text }]}>
+              Hello, {user?.username || 'Guest'} {isAdmin ? '👑' : user ? '👤' : '👋'}
+            </Text>
+            {user ? (
+              <View style={[
+                { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+                isAdmin
+                  ? { backgroundColor: isDark ? '#3b1f6e' : '#ede9fe' }
+                  : { backgroundColor: isDark ? '#1a3a2a' : '#dcfce7' }
+              ]}>
+                <Text style={[
+                  { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+                  isAdmin ? { color: '#8B5CF6' } : { color: '#16a34a' }
+                ]}>
+                  {isAdmin ? 'ADMIN' : 'USER'}
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push('/login')}
+                style={{
+                  backgroundColor: '#6366f1',
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  borderRadius: 16,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>🔑 เข้าสู่ระบบ</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={[styles.welcomeSub, { color: themeStyles.textSecondary }]}>
             Here is your dealership status for today.
           </Text>
@@ -106,12 +139,28 @@ export default function HomeScreen() {
 
         {/* Quick actions shortcut */}
         <View style={styles.shortcutRow}>
-          <TouchableOpacity 
-            style={[styles.shortcutBtn, { backgroundColor: '#8B5CF6' }]} 
-            onPress={() => router.push('/add')}
-          >
-            <Text style={styles.shortcutBtnText}>+ Add New Car</Text>
-          </TouchableOpacity>
+          {isAdmin ? (
+            <TouchableOpacity 
+              style={[styles.shortcutBtn, { backgroundColor: '#8B5CF6' }]} 
+              onPress={() => router.push('/add')}
+            >
+              <Text style={styles.shortcutBtnText}>+ Add New Car</Text>
+            </TouchableOpacity>
+          ) : !user ? (
+            <TouchableOpacity 
+              style={[styles.shortcutBtn, { backgroundColor: '#6366f1' }]} 
+              onPress={() => router.push('/login')}
+            >
+              <Text style={styles.shortcutBtnText}>🔑 เข้าสู่ระบบ (Login)</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.shortcutBtn, { backgroundColor: '#10b981' }]} 
+              onPress={() => router.push('/products')}
+            >
+              <Text style={styles.shortcutBtnText}>🛒 เลือกซื้อรถยนต์</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={[styles.shortcutBtn, { backgroundColor: isDark ? '#2E3135' : '#e0e1e6' }]} 
             onPress={() => router.push('/products')}

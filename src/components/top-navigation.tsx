@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeMode } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface TopNavigationProps {
   activeTab: 'home' | 'products' | 'add' | 'categories';
@@ -11,6 +12,7 @@ interface TopNavigationProps {
 export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationProps) {
   const router = useRouter();
   const { colorScheme, setThemeMode } = useThemeMode();
+  const { user, isAdmin, logout } = useAuth();
   const isDark = colorScheme === 'dark';
 
   // Do not render on Web to avoid duplicating top navigation
@@ -28,15 +30,27 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
     <View style={[styles.header, themeStyles.border, { backgroundColor: isDark ? '#161719' : 'white' }]}>
       <View style={styles.topRow}>
         <Text style={styles.headerTitle}>🚗 CarHub Portal</Text>
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {/* User name & role */}
+          {user && (
+            <Text style={{ fontSize: 12, color: isDark ? '#b0b4ba' : '#666', fontWeight: '600' }}>
+              {isAdmin ? '👑' : '👤'} {user.username}
+            </Text>
+          )}
+          {/* Theme toggle */}
           <TouchableOpacity 
             style={[styles.profileButton, { backgroundColor: isDark ? '#2E3135' : '#E0E1E6' }]} 
             onPress={() => setThemeMode(colorScheme === 'dark' ? 'light' : 'dark')}
           >
             <Text style={styles.profileIcon}>{colorScheme === 'dark' ? '☀️' : '🌙'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/products')}>
-            <Text style={styles.profileIcon}>{rightIcon}</Text>
+          {/* Logout button */}
+          <TouchableOpacity
+            id="mobile-logout-button"
+            style={[styles.profileButton, { backgroundColor: '#ef4444' }]}
+            onPress={logout}
+          >
+            <Text style={{ fontSize: 12, color: 'white', fontWeight: '700' }}>OUT</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -56,12 +70,15 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
           {activeTab === 'products' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/add')} style={styles.navItem}>
-          <Text style={[styles.navText, activeTab === 'add' ? styles.activeText : { color: themeStyles.textSecondary }]}>
-            Add
-          </Text>
-          {activeTab === 'add' && <View style={styles.activeIndicator} />}
-        </TouchableOpacity>
+        {/* Add — Admin only */}
+        {isAdmin && (
+          <TouchableOpacity onPress={() => router.push('/add')} style={styles.navItem}>
+            <Text style={[styles.navText, activeTab === 'add' ? styles.activeText : { color: themeStyles.textSecondary }]}>
+              Add
+            </Text>
+            {activeTab === 'add' && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity onPress={() => router.push('/categories')} style={styles.navItem}>
           <Text style={[styles.navText, activeTab === 'categories' ? styles.activeText : { color: themeStyles.textSecondary }]}>

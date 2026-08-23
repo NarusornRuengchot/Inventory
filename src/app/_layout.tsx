@@ -7,13 +7,16 @@ import AppTabs from '@/components/app-tabs';
 
 import { InventoryProvider } from '@/context/InventoryContext';
 import { ThemeModeProvider } from '@/context/ThemeContext';
+import { AuthProvider } from '@/context/AuthContext';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
   return (
     <ThemeModeProvider>
-      <TabLayoutContent />
+      <AuthProvider>
+        <TabLayoutContent />
+      </AuthProvider>
     </ThemeModeProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   StatusBar,
@@ -16,6 +16,7 @@ import { customAlert } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import { useInventory, Car } from '@/context/InventoryContext';
 import { TopNavigation } from '@/components/top-navigation';
+import { useAuth } from '@/context/AuthContext';
 
 const EMOJI_MAP: Record<string, string> = {
   tesla: '⚡',
@@ -40,6 +41,14 @@ export default function AddScreen() {
   const isDark = colorScheme === 'dark';
   
   const { addCar } = useInventory();
+  const { isAdmin } = useAuth();
+
+  // Guard: User role ไม่สามารถเข้าหน้านี้ได้
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace('/products');
+    }
+  }, [isAdmin]);
 
   // Form states matching used_car_inventory columns
   const [vin, setVin] = useState('');

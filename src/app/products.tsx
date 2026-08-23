@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Car, useInventory } from '@/context/InventoryContext';
 import { customAlert } from '@/utils/alert';
+import { useAuth } from '@/context/AuthContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_MARGIN = 8;
@@ -65,6 +66,7 @@ export default function ProductsScreen() {
   const isDark = colorScheme === 'dark';
 
   const { cars, sellCar, deleteCar, updateCar, loading } = useInventory();
+  const { isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | Car['status']>('All');
 
@@ -105,7 +107,8 @@ export default function ProductsScreen() {
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.originalCar.vin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // VIN search เฉพาะ Admin
+      (isAdmin && product.originalCar.vin && product.originalCar.vin.toLowerCase().includes(searchQuery.toLowerCase())) ||
       product.originalCar.license_plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.originalCar.color.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -298,9 +301,12 @@ export default function ProductsScreen() {
           ) : null}
         </View>
 
-        <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
-          <Text style={styles.addProductText}>+ Add Car</Text>
-        </TouchableOpacity>
+        {/* Add Car button — Admin only */}
+        {isAdmin && (
+          <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
+            <Text style={styles.addProductText}>+ Add Car</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[
@@ -387,12 +393,15 @@ export default function ProductsScreen() {
                   <View style={styles.cardBottom}>
                     {/* Quick Action Buttons */}
                     <View style={styles.quickActions}>
-                      <TouchableOpacity
-                        style={[styles.quickActionBtn, styles.editBtn]}
-                        onPress={() => handleOpenEditModal(product.originalCar)}
-                      >
-                        <Text style={styles.quickActionText}>✏️</Text>
-                      </TouchableOpacity>
+                      {/* Edit — Admin only */}
+                      {isAdmin && (
+                        <TouchableOpacity
+                          style={[styles.quickActionBtn, styles.editBtn]}
+                          onPress={() => handleOpenEditModal(product.originalCar)}
+                        >
+                          <Text style={styles.quickActionText}>✏️</Text>
+                        </TouchableOpacity>
+                      )}
 
                       {product.badge_status !== 'Sold' && (
                         <TouchableOpacity
@@ -403,12 +412,15 @@ export default function ProductsScreen() {
                         </TouchableOpacity>
                       )}
 
-                      <TouchableOpacity
-                        style={[styles.quickActionBtn, styles.deleteBtn]}
-                        onPress={() => handleDelete(product.originalCar)}
-                      >
-                        <Text style={styles.quickActionText}>🗑️</Text>
-                      </TouchableOpacity>
+                      {/* Delete — Admin only */}
+                      {isAdmin && (
+                        <TouchableOpacity
+                          style={[styles.quickActionBtn, styles.deleteBtn]}
+                          onPress={() => handleDelete(product.originalCar)}
+                        >
+                          <Text style={styles.quickActionText}>🗑️</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     {/* Detail button */}
@@ -472,7 +484,8 @@ export default function ProductsScreen() {
                   {/* Info Grid */}
                   <ScrollView style={{ maxHeight: 200 }} contentContainerStyle={{ gap: 0 }}>
                     {[
-                      ['VIN', detailCar.vin],
+                      // VIN เฉพาะ Admin
+                      ...(isAdmin ? [['VIN', detailCar.vin || 'N/A']] : []),
                       ['Mileage', `${detailCar.mileage.toLocaleString()} km`],
                       ['Transmission', detailCar.transmission],
                       ['Fuel Type', detailCar.fuel_type],
@@ -498,12 +511,15 @@ export default function ProductsScreen() {
                       <Text style={{ color: isDark ? '#fff' : '#333', fontWeight: '700', fontSize: 13 }}>✕ Close</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.detailActionBtn, { backgroundColor: '#3B82F6' }]}
-                      onPress={() => handleOpenEditModal(detailCar)}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>✏️ Edit</Text>
-                    </TouchableOpacity>
+                    {/* Edit — Admin only */}
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, { backgroundColor: '#3B82F6' }]}
+                        onPress={() => handleOpenEditModal(detailCar)}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>✏️ Edit</Text>
+                      </TouchableOpacity>
+                    )}
 
                     {detailCar.status !== 'Sold' && (
                       <TouchableOpacity
@@ -514,12 +530,15 @@ export default function ProductsScreen() {
                       </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity
-                      style={[styles.detailActionBtn, { backgroundColor: '#EF4444' }]}
-                      onPress={() => handleDelete(detailCar)}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>🗑️</Text>
-                    </TouchableOpacity>
+                    {/* Delete — Admin only */}
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, { backgroundColor: '#EF4444' }]}
+                        onPress={() => handleDelete(detailCar)}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>🗑️</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               );
