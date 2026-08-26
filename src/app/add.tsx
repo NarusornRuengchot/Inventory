@@ -1,22 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import { TopNavigation } from '@/components/top-navigation';
+import { useAuth } from '@/context/AuthContext';
+import { Car, useInventory } from '@/context/InventoryContext';
+import { customAlert } from '@/utils/alert';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
+  Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ScrollView,
   useColorScheme,
-  Platform,
+  View,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { customAlert } from '@/utils/alert';
-import { useRouter } from 'expo-router';
-import { useInventory, Car } from '@/context/InventoryContext';
-import { TopNavigation } from '@/components/top-navigation';
-import { useAuth } from '@/context/AuthContext';
 
 const EMOJI_MAP: Record<string, string> = {
   tesla: '⚡',
@@ -39,7 +39,7 @@ export default function AddScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
   const { addCar } = useInventory();
   const { isAdmin } = useAuth();
 
@@ -170,7 +170,7 @@ export default function AddScreen() {
             setSelectedEmoji('🚗');
             setImageUrl('');
             setImageUrlError(false);
-            
+
             router.push('/products');
           },
         },
@@ -188,7 +188,7 @@ export default function AddScreen() {
     labelColor: isDark ? '#b0b4ba' : '#444',
   };
 
-  const inputStyle = [styles.input, { 
+  const inputStyle = [styles.input, {
     borderColor: themeStyles.inputBorder,
     color: themeStyles.inputText,
     backgroundColor: themeStyles.inputBg
@@ -197,7 +197,7 @@ export default function AddScreen() {
   return (
     <SafeAreaView style={[styles.container, themeStyles.container]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
-      
+
       {/* Header */}
       {Platform.OS !== 'web' && <TopNavigation activeTab="add" rightIcon={selectedEmoji} />}
 

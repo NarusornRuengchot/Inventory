@@ -70,10 +70,10 @@ export default function AppTabs() {
             <TabButton>Categories</TabButton>
           </TabTrigger>
 
-          {/* Orders tab — Admin only */}
-          {isAdmin && (
+          {/* Orders tab — Logged in users */}
+          {user && (
             <TabTrigger name="orders" href="/orders" asChild>
-              <TabButton>📋 Orders</TabButton>
+              <TabButton>{isAdmin ? '📋 Orders' : '📦 My Orders'}</TabButton>
             </TabTrigger>
           )}
 
@@ -89,8 +89,8 @@ export default function AppTabs() {
             <TabButton>Register</TabButton>
           </TabTrigger>
 
-          {/* Orders trigger ซ่อนไว้ เพื่อให้ Slot render หน้าได้เสมอ (admin ไม่ login อยู่) */}
-          {!isAdmin && (
+          {/* Orders trigger ซ่อนไว้ เมื่อยังไม่ได้ login เพื่อให้ Slot render หน้าได้เสมอ */}
+          {!user && (
             <TabTrigger name="orders" href="/orders" asChild style={{ display: 'none' }}>
               <TabButton>Orders</TabButton>
             </TabTrigger>
@@ -184,6 +184,17 @@ export function WebFooterNav() {
             </ThemedView>
           </Pressable>
         </Link>
+
+        {/* Orders link if logged in */}
+        {user && (
+          <Link href="/orders" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type={getButtonType('/orders')} style={styles.tabButtonView}>
+                <ThemedText type="small" themeColor={getTextColor('/orders')}>{isAdmin ? 'Orders' : 'My Orders'}</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Link>
+        )}
 
         {/* Theme Toggle Tab */}
         <Pressable

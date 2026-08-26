@@ -449,11 +449,12 @@ app.post('/api/orders', authToken, async (req, res) => {
   }
 });
 
-// GET /api/orders — ดูคำสั่งซื้อทั้งหมด
-// Admin only — เห็นทุก order พร้อมข้อมูลรถและผู้ซื้อ
-app.get('/api/orders', authToken, requireAdmin, async (req, res) => {
+// GET /api/orders — ดูคำสั่งซื้อ
+// Admin: เห็นทุก order
+// User ทั่วไป: เห็นเฉพาะ order ที่ตนเองเป็นคนสั่งซื้อ (user_id = req.user.id)
+app.get('/api/orders', authToken, async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    let query = `
       SELECT
         o.*,
         c.brand, c.model, c.model_year, c.selling_price,
@@ -462,8 +463,17 @@ app.get('/api/orders', authToken, requireAdmin, async (req, res) => {
       FROM orders o
       LEFT JOIN used_car_inventory c ON o.car_id = c.car_id
       LEFT JOIN users u ON o.user_id = u.id
-      ORDER BY o.created_at DESC
-    `);
+    `;
+    const params = [];
+
+    if (req.user.role !== 'admin') {
+      query += ` WHERE o.user_id = ? `;
+      params.push(req.user.id);
+    }
+
+    query += ` ORDER BY o.created_at DESC `;
+
+    const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (e) {
     console.error('Get Orders Error:', e.message);

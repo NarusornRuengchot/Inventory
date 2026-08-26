@@ -32,7 +32,7 @@ export default function OrdersScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const { token, isAdmin, isLoading: authLoading } = useAuth();
+  const { token, user, isAdmin, isLoading: authLoading } = useAuth();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,12 +47,12 @@ export default function OrdersScreen() {
   // Filter
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-  // Redirect if not admin
+  // Redirect if not logged in
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      router.replace('/');
+    if (!authLoading && !user) {
+      router.replace('/login');
     }
-  }, [authLoading, isAdmin]);
+  }, [authLoading, user]);
 
   // Fetch orders from API
   const fetchOrders = useCallback(async () => {
@@ -61,7 +61,10 @@ export default function OrdersScreen() {
       const resp = await fetch(`${API_BASE_URL}/orders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!resp.ok) throw new Error('Failed to fetch orders');
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP error ${resp.status}`);
+      }
       const data = await resp.json();
       setOrders(data);
     } catch (e: any) {
@@ -171,7 +174,7 @@ export default function OrdersScreen() {
     }
   };
 
-  if (authLoading || (!isAdmin && !authLoading)) {
+  if (authLoading || (!user && !authLoading)) {
     return (
       <View style={[styles.center, { backgroundColor: isDark ? '#0F1117' : '#F5F5F5' }]}>
         <ActivityIndicator size="large" color="#8B5CF6" />
@@ -185,10 +188,12 @@ export default function OrdersScreen() {
       <View style={[styles.header, { backgroundColor: isDark ? '#1A1D27' : '#FFFFFF', borderBottomColor: isDark ? '#2A2D3A' : '#EEEEEE' }]}>
         <View>
           <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#111827' }]}>
-            📋 Purchase Orders
+            {isAdmin ? '📋 Order Management' : '📦 My Orders'}
           </Text>
           <Text style={[styles.headerSub, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
-            {pendingCount > 0 ? `${pendingCount} order${pendingCount > 1 ? 's' : ''} awaiting approval` : 'No pending orders'}
+            {isAdmin
+              ? (pendingCount > 0 ? `${pendingCount} order${pendingCount > 1 ? 's' : ''} awaiting approval` : 'No pending orders')
+              : 'Track your car purchase order status'}
           </Text>
         </View>
         <TouchableOpacity
@@ -211,7 +216,13 @@ export default function OrdersScreen() {
               styles.filterTabText,
               { color: filterStatus === s ? '#8B5CF6' : (isDark ? '#9CA3AF' : '#6B7280') }
             ]}>
-              {s === 'all' ? 'All' : s === 'pending' ? `⏳ Pending (${pendingCount})` : s === 'approved' ? '✅ Approved' : '❌ Rejected'}
+              {s === 'all'
+                ? 'All'
+                : s === 'pending'
+                ? `⏳ Pending ${isAdmin ? `(${pendingCount})` : ''}`
+                : s === 'approved'
+                ? '✅ Approved'
+                : '❌ Rejected'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -231,7 +242,9 @@ export default function OrdersScreen() {
           {filteredOrders.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={{ fontSize: 48 }}>📭</Text>
-              <Text style={[styles.emptyText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>No orders found</Text>
+              <Text style={[styles.emptyText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                {isAdmin ? 'No orders found' : 'You have no orders yet'}
+              </Text>
             </View>
           ) : (
             filteredOrders.map((order) => {
@@ -265,7 +278,9 @@ export default function OrdersScreen() {
                   {/* Buyer Info */}
                   <View style={[styles.divider, { borderColor: isDark ? '#2A2D3A' : '#F3F4F6' }]} />
                   <View style={styles.buyerSection}>
-                    <Text style={[styles.sectionLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>BUYER INFORMATION</Text>
+                    <Text style={[styles.sectionLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                      {isAdmin ? 'BUYER INFORMATION' : 'ORDER DETAILS'}
+                    </Text>
                     <View style={styles.infoRow}>
                       <Text style={[styles.infoLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>👤 Name</Text>
                       <Text style={[styles.infoValue, { color: isDark ? '#FFFFFF' : '#111827' }]}>{order.buyer_name}</Text>
@@ -286,7 +301,7 @@ export default function OrdersScreen() {
                         </Text>
                       </View>
                     </View>
-                    {order.buyer_username && (
+                    {isAdmin && order.buyer_username && (
                       <View style={styles.infoRow}>
                         <Text style={[styles.infoLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>🔑 User</Text>
                         <Text style={[styles.infoValue, { color: isDark ? '#FFFFFF' : '#111827' }]}>{order.buyer_username}</Text>
@@ -307,8 +322,38 @@ export default function OrdersScreen() {
                     )}
                   </View>
 
-                  {/* Action Buttons — Only for Pending */}
-                  {order.status === 'pending' && (
+                  {/* Status Banner for User */}
+                  {!isAdmin && (
+                    <View style={[
+                      styles.adminNoteBox,
+                      {
+                        backgroundColor: order.status === 'approved'
+                          ? (isDark ? '#064E3B' : '#D1FAE5')
+                          : order.status === 'rejected'
+                          ? (isDark ? '#7F1D1D' : '#FEE2E2')
+                          : (isDark ? '#78350F' : '#FEF3C7'),
+                        marginTop: 12,
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.adminNoteText,
+                        {
+                          color: order.status === 'approved'
+                            ? (isDark ? '#6EE7B7' : '#065F46')
+                            : order.status === 'rejected'
+                            ? (isDark ? '#FCA5A5' : '#991B1B')
+                            : (isDark ? '#FDE68A' : '#92400E')
+                        }
+                      ]}>
+                        {order.status === 'approved' && '🎉 Order Approved! Our team will contact you soon for pickup/delivery.'}
+                        {order.status === 'pending' && '⏳ Order is being reviewed by our admin team.'}
+                        {order.status === 'rejected' && '❌ This order was rejected. Please contact us for more information.'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Action Buttons — Admin only for Pending */}
+                  {isAdmin && order.status === 'pending' && (
                     <View style={styles.actionRow}>
                       <TouchableOpacity
                         style={[styles.actionBtn, styles.rejectBtn]}

@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   return (
     <NativeTabs
@@ -49,10 +49,10 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* Tab Orders — Admin only */}
-      {isAdmin && (
+      {/* Tab Orders — ผู้ใช้งานที่ล็อกอินแล้วทุกคน */}
+      {user && (
         <NativeTabs.Trigger name="orders">
-          <NativeTabs.Trigger.Label>Orders</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>{isAdmin ? 'Orders' : 'My Orders'}</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
             src={require('@/assets/images/tabIcons/products.png')}
             renderingMode="template"
