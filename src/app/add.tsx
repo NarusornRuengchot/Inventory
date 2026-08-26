@@ -343,8 +343,9 @@ export default function AddScreen() {
               <Text style={[styles.label, { color: themeStyles.labelColor }]}>License Plate *</Text>
               <TextInput
                 style={inputStyle}
-                placeholder="กข-1234"
-                placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                placeholder="ABC-1234"
+                placeholderTextColor={isDark ? '#8A8E94' : '#999999'}
+                autoCapitalize="characters"
                 value={licensePlate}
                 onChangeText={setLicensePlate}
               />

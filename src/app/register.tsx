@@ -47,19 +47,19 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     setError('');
     if (!username.trim()) {
-      setError('กรุณากรอก Username');
+      setError('Please enter a username.');
       return;
     }
     if (username.trim().length < 3) {
-      setError('Username ต้องมีอย่างน้อย 3 ตัวอักษร');
+      setError('Username must be at least 3 characters.');
       return;
     }
     if (password.length < 6) {
-      setError('Password ต้องมีอย่างน้อย 6 ตัวอักษร');
+      setError('Password must be at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Password ไม่ตรงกัน');
+      setError('Passwords do not match.');
       return;
     }
 
@@ -68,7 +68,7 @@ export default function RegisterScreen() {
       await register(username.trim(), password);
       router.replace('/');
     } catch (e: any) {
-      setError(e.message || 'สมัครสมาชิกไม่สำเร็จ');
+      setError(e.message || 'Registration failed. Username may already be taken.');
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +96,7 @@ export default function RegisterScreen() {
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <Text style={[styles.backButtonText, { color: theme.accent }]}>← กลับ</Text>
+            <Text style={[styles.backButtonText, { color: theme.accent }]}>← Back</Text>
           </TouchableOpacity>
 
           {/* Header */}
@@ -104,17 +104,17 @@ export default function RegisterScreen() {
             <View style={[styles.logoContainer, { backgroundColor: '#10b981' }]}>
               <Text style={styles.logoEmoji}>✨</Text>
             </View>
-            <Text style={[styles.appTitle, { color: theme.text }]}>สมัครสมาชิก</Text>
+            <Text style={[styles.appTitle, { color: theme.text }]}>Create Account</Text>
             <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>
-              สร้างบัญชีผู้ใช้ใหม่
+              Sign up for a new user account
             </Text>
           </View>
 
           {/* Role Info */}
           <View style={[styles.infoBox, { backgroundColor: isDark ? '#0f2520' : '#f0fdf4', borderColor: isDark ? '#1a4a30' : '#bbf7d0' }]}>
-            <Text style={[styles.infoTitle, { color: theme.success }]}>👤 Role: User</Text>
+            <Text style={[styles.infoTitle, { color: theme.success }]}>👤 Role: Standard User</Text>
             <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-              บัญชีที่สมัครจะมีสิทธิ์เป็น User สามารถดูและซื้อรถได้
+              Registered accounts have User access to view inventory and submit purchase orders.
             </Text>
           </View>
 
@@ -144,7 +144,7 @@ export default function RegisterScreen() {
                 <TextInput
                   id="register-username"
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="อย่างน้อย 3 ตัวอักษร"
+                  placeholder="At least 3 characters"
                   placeholderTextColor={theme.textSecondary}
                   value={username}
                   onChangeText={(t) => { setUsername(t); setError(''); }}
@@ -163,7 +163,7 @@ export default function RegisterScreen() {
                 <TextInput
                   id="register-password"
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                  placeholder="At least 6 characters"
                   placeholderTextColor={theme.textSecondary}
                   value={password}
                   onChangeText={(t) => { setPassword(t); setError(''); }}
@@ -182,7 +182,7 @@ export default function RegisterScreen() {
 
             {/* Confirm Password */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>ยืนยัน Password</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Confirm Password</Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -196,7 +196,7 @@ export default function RegisterScreen() {
                 <TextInput
                   id="register-confirm-password"
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="กรอก password อีกครั้ง"
+                  placeholder="Re-enter your password"
                   placeholderTextColor={theme.textSecondary}
                   value={confirmPassword}
                   onChangeText={(t) => { setConfirmPassword(t); setError(''); }}
@@ -227,7 +227,7 @@ export default function RegisterScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <Text style={styles.registerButtonText}>สมัครสมาชิก</Text>
+                <Text style={styles.registerButtonText}>Register</Text>
               )}
             </TouchableOpacity>
 
@@ -238,8 +238,8 @@ export default function RegisterScreen() {
               style={styles.loginLink}
             >
               <Text style={[styles.loginLinkText, { color: theme.textSecondary }]}>
-                มีบัญชีแล้ว?{' '}
-                <Text style={{ color: theme.accent, fontWeight: '700' }}>เข้าสู่ระบบ</Text>
+                Already have an account?{' '}
+                <Text style={{ color: theme.accent, fontWeight: '700' }}>Sign In</Text>
               </Text>
             </TouchableOpacity>
           </View>

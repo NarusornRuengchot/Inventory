@@ -14,15 +14,9 @@ export const customAlert = (
   if (Platform.OS === 'web') {
     if (buttons && buttons.length > 0) {
       if (buttons.length > 1) {
-        // Multi-button dialog (e.g. Cancel and Delete)
-        // We find the confirm/action button (which is usually destructive or has text like "Delete" or "OK")
-        const confirmBtn = buttons.find(
-          (b) => b.style === 'destructive' || 
-                 b.text?.toLowerCase() === 'delete' || 
-                 b.text?.toLowerCase() === 'ok' || 
-                 b.text?.toLowerCase() === 'confirm'
-        );
-        const cancelBtn = buttons.find((b) => b.style === 'cancel' || b.text?.toLowerCase() === 'cancel');
+        // Multi-button dialog (e.g. Cancel and Confirm/Approve/Delete)
+        const cancelBtn = buttons.find((b) => b.style === 'cancel' || b.text?.toLowerCase() === 'cancel' || b.text?.toLowerCase() === 'ยกเลิก');
+        const confirmBtn = buttons.find((b) => b !== cancelBtn);
 
         const result = window.confirm(`${title}${message ? '\n\n' + message : ''}`);
         if (result) {

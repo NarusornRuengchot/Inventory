@@ -77,7 +77,7 @@ export default function HomeScreen() {
                   borderRadius: 16,
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>🔑 เข้าสู่ระบบ</Text>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>🔑 Sign In</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -151,14 +151,14 @@ export default function HomeScreen() {
               style={[styles.shortcutBtn, { backgroundColor: '#6366f1' }]} 
               onPress={() => router.push('/login')}
             >
-              <Text style={styles.shortcutBtnText}>🔑 เข้าสู่ระบบ (Login)</Text>
+              <Text style={styles.shortcutBtnText}>🔑 Sign In</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
               style={[styles.shortcutBtn, { backgroundColor: '#10b981' }]} 
               onPress={() => router.push('/products')}
             >
-              <Text style={styles.shortcutBtnText}>🛒 เลือกซื้อรถยนต์</Text>
+              <Text style={styles.shortcutBtnText}>🛒 Browse & Buy Cars</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity 

@@ -45,7 +45,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      setError('กรุณากรอก Username และ Password');
+      setError('Please enter both Username and Password.');
       return;
     }
     setError('');
@@ -54,7 +54,7 @@ export default function LoginScreen() {
       await login(username.trim(), password);
       router.replace('/');
     } catch (e: any) {
-      setError(e.message || 'เข้าสู่ระบบไม่สำเร็จ');
+      setError(e.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export default function LoginScreen() {
             </View>
             <Text style={[styles.appTitle, { color: theme.text }]}>CarHub</Text>
             <Text style={[styles.appSubtitle, { color: theme.textSecondary }]}>
-              ระบบจัดการรถยนต์มือสอง
+              Dealership Inventory System
             </Text>
           </View>
 
@@ -97,9 +97,9 @@ export default function LoginScreen() {
               },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: theme.text }]}>เข้าสู่ระบบ</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Sign In</Text>
             <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>
-              ยินดีต้อนรับกลับมา 👋
+              Welcome back 👋
             </Text>
 
             {/* Error Message */}
@@ -117,7 +117,7 @@ export default function LoginScreen() {
                 <TextInput
                   id="login-username"
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="กรอก username"
+                  placeholder="Enter your username"
                   placeholderTextColor={theme.textSecondary}
                   value={username}
                   onChangeText={(t) => { setUsername(t); setError(''); }}
@@ -136,7 +136,7 @@ export default function LoginScreen() {
                 <TextInput
                   id="login-password"
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="กรอก password"
+                  placeholder="Enter your password"
                   placeholderTextColor={theme.textSecondary}
                   value={password}
                   onChangeText={(t) => { setPassword(t); setError(''); }}
@@ -169,14 +169,14 @@ export default function LoginScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <Text style={styles.loginButtonText}>เข้าสู่ระบบ</Text>
+                <Text style={styles.loginButtonText}>Sign In</Text>
               )}
             </TouchableOpacity>
 
             {/* Divider */}
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: theme.cardBorder }]} />
-              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>หรือ</Text>
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>or</Text>
               <View style={[styles.dividerLine, { backgroundColor: theme.cardBorder }]} />
             </View>
 
@@ -188,17 +188,10 @@ export default function LoginScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.registerButtonText, { color: theme.text }]}>
-                ยังไม่มีบัญชี?{' '}
-                <Text style={{ color: theme.accent, fontWeight: '700' }}>สมัครสมาชิก</Text>
+                Don&apos;t have an account?{' '}
+                <Text style={{ color: theme.accent, fontWeight: '700' }}>Register</Text>
               </Text>
             </TouchableOpacity>
-          </View>
-
-          {/* Default Credentials Hint */}
-          <View style={[styles.hintBox, { backgroundColor: isDark ? '#1a1a28' : '#eef2ff', borderColor: isDark ? '#2a2a4e' : '#c7d2fe' }]}>
-            <Text style={[styles.hintTitle, { color: theme.accent }]}>🔑 บัญชีเริ่มต้น (Admin)</Text>
-            <Text style={[styles.hintText, { color: theme.textSecondary }]}>Username: admin</Text>
-            <Text style={[styles.hintText, { color: theme.textSecondary }]}>Password: admin123</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -343,20 +336,5 @@ const styles = StyleSheet.create({
   registerButtonText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  hintBox: {
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    gap: 4,
-  },
-  hintTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  hintText: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });

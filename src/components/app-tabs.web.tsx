@@ -1,3 +1,26 @@
+// ============================================================
+// app-tabs.web.tsx — Navigation หลักสำหรับ Web platform
+// ============================================================
+// ไฟล์นี้ใช้แทน app-tabs.tsx เฉพาะบน Web (Expo platform-specific)
+// ใช้ expo-router/ui: Tabs, TabList, TabTrigger, TabSlot
+//
+// โครงสร้าง:
+//   AppTabs           ← root component: ครอบ Tabs + TabSlot + TabList
+//     ├── TabSlot     ← พื้นที่แสดงหน้าปัจจุบัน (content area)
+//     ├── CustomTabList (top)    ← แถบ navigation บนสุด
+//     └── WebFooterNav          ← แถบ navigation ล่างสุด
+//
+// ⚠️ สำคัญ: ทุก route ที่ต้องการนำทางถึงต้องลงทะเบียนเป็น TabTrigger
+//   ใน TabList ก่อน มิฉะนั้น TabSlot จะไม่ render หน้านั้น
+//   (login/register ก็ต้องลงทะเบียนแม้จะไม่ได้แสดงในเมนูปกติ)
+//
+// RBAC ใน Navigation:
+//   - ปุ่ม "Add" แสดงเฉพาะ isAdmin = true
+//   - ปุ่ม "Login" แสดงเฉพาะ user = null (ยังไม่ได้ login)
+//   - ปุ่ม "Logout" แสดงเฉพาะ user != null (login แล้ว)
+// ============================================================
+
+import { Link, usePathname } from 'expo-router';
 import {
   TabList,
   TabListProps,
@@ -7,17 +30,16 @@ import {
   TabTriggerSlotProps,
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, useColorScheme, View, useWindowDimensions, TouchableOpacity } from 'react-native';
-import { Link, usePathname } from 'expo-router';
+import { Pressable, StyleSheet, TouchableOpacity, useColorScheme, useWindowDimensions, View } from 'react-native';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/context/AuthContext'; // ดึง user/isAdmin สำหรับ RBAC
 import { useThemeMode } from '@/context/ThemeContext';
-import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   const theme = useTheme();
@@ -28,7 +50,7 @@ export default function AppTabs() {
       <View style={[styles.slotContainer, { backgroundColor: theme.background }]}>
         <TabSlot style={{ height: '100%' }} />
       </View>
-      
+
       {/* Top Navigation Menu */}
       <TabList asChild>
         <CustomTabList position="top">
@@ -48,6 +70,13 @@ export default function AppTabs() {
             <TabButton>Categories</TabButton>
           </TabTrigger>
 
+          {/* Orders tab — Admin only */}
+          {isAdmin && (
+            <TabTrigger name="orders" href="/orders" asChild>
+              <TabButton>📋 Orders</TabButton>
+            </TabTrigger>
+          )}
+
           {/* Login tab — แสดงเมื่อยังไม่ login เพื่อให้ Expo TabSlot รู้จักเส้นทาง */}
           {!user && (
             <TabTrigger name="login" href="/login" asChild>
@@ -59,6 +88,13 @@ export default function AppTabs() {
           <TabTrigger name="register" href="/register" asChild style={{ display: 'none' }}>
             <TabButton>Register</TabButton>
           </TabTrigger>
+
+          {/* Orders trigger ซ่อนไว้ เพื่อให้ Slot render หน้าได้เสมอ (admin ไม่ login อยู่) */}
+          {!isAdmin && (
+            <TabTrigger name="orders" href="/orders" asChild style={{ display: 'none' }}>
+              <TabButton>Orders</TabButton>
+            </TabTrigger>
+          )}
         </CustomTabList>
       </TabList>
 
@@ -88,7 +124,7 @@ export function WebFooterNav() {
   const { colorScheme, setThemeMode } = useThemeMode();
   const { isAdmin, user, logout } = useAuth();
   const isNarrow = width < 600;
-  
+
   const getButtonType = (routePath: string) => {
     const isActive = pathname === routePath || (routePath !== '/' && pathname.startsWith(routePath));
     return isActive ? 'backgroundSelected' : 'backgroundElement';
@@ -101,10 +137,10 @@ export function WebFooterNav() {
 
   return (
     <View style={styles.tabListContainerBottom}>
-      <ThemedView 
-        type="backgroundElement" 
+      <ThemedView
+        type="backgroundElement"
         style={[
-          styles.innerContainer, 
+          styles.innerContainer,
           isNarrow && { justifyContent: 'center', flexGrow: 0 }
         ]}
       >
@@ -150,7 +186,7 @@ export function WebFooterNav() {
         </Link>
 
         {/* Theme Toggle Tab */}
-        <Pressable 
+        <Pressable
           onPress={() => setThemeMode(colorScheme === 'dark' ? 'light' : 'dark')}
           style={({ pressed }) => pressed && styles.pressed}
         >
@@ -205,15 +241,15 @@ export function CustomTabList({ position = 'top', ...props }: CustomTabListProps
   const { colorScheme, setThemeMode } = useThemeMode();
   const { user, logout } = useAuth();
   const isNarrow = width < 600;
-  
+
   const containerStyle = position === 'bottom' ? styles.tabListContainerBottom : styles.tabListContainerTop;
 
   return (
     <View {...props} style={containerStyle}>
-      <ThemedView 
-        type="backgroundElement" 
+      <ThemedView
+        type="backgroundElement"
         style={[
-          styles.innerContainer, 
+          styles.innerContainer,
           isNarrow && { justifyContent: 'center', flexGrow: 0 }
         ]}
       >
@@ -228,7 +264,7 @@ export function CustomTabList({ position = 'top', ...props }: CustomTabListProps
         {position === 'top' && !isNarrow && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
             {/* Theme Toggle Web */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setThemeMode(colorScheme === 'dark' ? 'light' : 'dark')}
               style={styles.externalPressable}
             >

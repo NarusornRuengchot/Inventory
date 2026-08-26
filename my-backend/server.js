@@ -1,4 +1,12 @@
-require('dotenv').config();
+// ============================================================
+// server.js — Backend API สำหรับระบบ Inventory รถยนต์มือสอง
+// ============================================================
+// เชื่อมต่อ: MySQL (ip_std6730202246) บน port 3024
+// Auth:      JWT (jsonwebtoken) + bcrypt สำหรับ hash password
+// RBAC:      role 'admin' และ 'user' — ดูรายละเอียดแต่ละ endpoint
+// ============================================================
+
+require('dotenv').config();         // โหลด .env (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET)
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -6,12 +14,16 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 const app = express();
-const port = process.env.PORT || 3024;
+const port = process.env.PORT || 3024;  // Port จาก .env หรือ default 3024
 
-app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(cors());                              // อนุญาต cross-origin request จาก frontend
+app.use(express.json({ limit: '5mb' }));      // รับ JSON body สูงสุด 5MB (รองรับ image_url ยาวๆ)
 
+// ─────────────────────────────────────────────────────────────
 // MySQL Connection Pool
+// เชื่อมต่อ DB ผ่าน pool เพื่อ reuse connection (ประสิทธิภาพดีกว่า)
+// Config อ่านจาก .env ทั้งหมด
+// ─────────────────────────────────────────────────────────────
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -21,16 +33,21 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  timezone: '+07:00'
+  timezone: '+07:00'   // ใช้ timezone ไทย
 });
 
-// Test connection and setup users table on startup
+// ─────────────────────────────────────────────────────────────
+// initDB — ทำงานครั้งแรกตอน server start
+// 1. ทดสอบ DB connection
+// 2. สร้าง table `users` ถ้ายังไม่มี
+// 3. สร้าง admin account เริ่มต้น (admin/admin123) ถ้ายังไม่มี
+// ─────────────────────────────────────────────────────────────
 (async function initDB() {
   try {
     const conn = await pool.getConnection();
     console.log('Connected to MySQL:', process.env.DB_NAME);
 
-    // Create users table if not exists
+    // สร้าง table users (เก็บข้อมูลผู้ใช้ระบบ)
     await conn.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -41,7 +58,24 @@ const pool = mysql.createPool({
       )
     `);
 
-    // Insert default admin if not exists
+    // สร้าง table orders (เก็บคำสั่งซื้อจากผู้ใช้)
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        car_id INT NOT NULL,
+        user_id INT,
+        buyer_name VARCHAR(100) NOT NULL,
+        buyer_phone VARCHAR(20) NOT NULL,
+        buyer_address TEXT NOT NULL,
+        delivery_type ENUM('pickup', 'delivery') NOT NULL DEFAULT 'pickup',
+        status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+        admin_note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // สร้าง admin เริ่มต้นอัตโนมัติ (เฉพาะครั้งแรก)
     const [existing] = await conn.query('SELECT id FROM users WHERE username = ?', ['admin']);
     if (existing.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -59,15 +93,18 @@ const pool = mysql.createPool({
   }
 })();
 
-// JWT Secret
+// JWT Secret key (ตั้งค่าใน .env ด้วย JWT_SECRET)
 const JWT_SECRET = process.env.JWT_SECRET || 'mysecretkey';
 
-// ─────────────────────────────────────────
-// Middleware: Verify JWT token
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Middleware: authToken
+// ตรวจสอบ JWT token ใน Authorization header
+// ใช้กับ endpoint ที่ต้องการ login ก่อน
+// ถ้าไม่มี token → 401 | token ผิด/หมดอายุ → 403
+// ─────────────────────────────────────────────────────────────
 function authToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && authHeader.split(' ')[1]; // รูปแบบ: "Bearer <token>"
 
   if (!token) {
     return res.status(401).json({ error: 'Access Token Required' });
@@ -77,14 +114,16 @@ function authToken(req, res, next) {
     if (err) {
       return res.status(403).json({ error: 'Invalid or Expired Token' });
     }
-    req.user = user;
+    req.user = user;  // แนบข้อมูล user (id, username, role) ไปกับ request
     next();
   });
 }
 
-// ─────────────────────────────────────────
-// Middleware: Admin only
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Middleware: requireAdmin
+// ใช้ต่อจาก authToken — block ถ้า role ไม่ใช่ 'admin'
+// ใช้กับ endpoint ที่ admin เท่านั้นทำได้ (เพิ่ม/ลบรถ)
+// ─────────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -92,9 +131,12 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ─────────────────────────────────────────
-// Middleware: Optional auth (ไม่ block ถ้าไม่มี token)
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Middleware: optionalAuth
+// เหมือน authToken แต่ไม่ block ถ้าไม่มี token
+// req.user จะเป็น null ถ้าไม่ได้ login
+// ใช้กับ GET /api/products เพื่อซ่อน VIN จาก guest/user
+// ─────────────────────────────────────────────────────────────
 function optionalAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -106,7 +148,7 @@ function optionalAuth(req, res, next) {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      req.user = null;
+      req.user = null;  // token ผิด → ถือว่า guest
     } else {
       req.user = user;
     }
@@ -114,11 +156,15 @@ function optionalAuth(req, res, next) {
   });
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
 // AUTH ENDPOINTS
-// ─────────────────────────────────────────
+// เชื่อมต่อกับ: src/context/AuthContext.tsx (frontend)
+// ═══════════════════════════════════════════════════════════
 
-// POST /api/auth/register — สร้าง user ใหม่ (role = user เสมอ)
+// POST /api/auth/register
+// รับ: { username, password }
+// ส่งกลับ: { token, user } — สมัครแล้ว login อัตโนมัติ
+// role ที่ได้: 'user' เสมอ (admin สร้างได้แค่ผ่าน DB โดยตรง)
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -138,12 +184,13 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(409).json({ error: 'Username already exists' });
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(password, 10);  // hash password ก่อนเก็บ
     const [result] = await pool.query(
       'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
       [username, password_hash, 'user']
     );
 
+    // สร้าง JWT token อายุ 7 วัน
     const token = jwt.sign(
       { id: result.insertId, username, role: 'user' },
       JWT_SECRET,
@@ -162,6 +209,8 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // POST /api/auth/login
+// รับ: { username, password }
+// ส่งกลับ: { token, user } — frontend เก็บ token ใน AsyncStorage
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -176,7 +225,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = rows[0];
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    const isMatch = await bcrypt.compare(password, user.password_hash);  // เปรียบเทียบ hash
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
@@ -198,7 +247,9 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me — ดึงข้อมูล user จาก token (สำหรับ auto-login)
+// GET /api/auth/me
+// ใช้ตอน app เปิดใหม่ — ตรวจสอบว่า token เก่าใน AsyncStorage ยังใช้ได้มั้ย
+// ถ้าได้ → ส่ง user กลับ (auto-login)
 app.get('/api/auth/me', authToken, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -215,19 +266,23 @@ app.get('/api/auth/me', authToken, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
 // PRODUCTS ENDPOINTS
-// ─────────────────────────────────────────
+// เชื่อมต่อกับ: src/context/InventoryContext.tsx (frontend)
+// ตาราง DB: used_car_inventory
+// ═══════════════════════════════════════════════════════════
 
-// GET /api/products — ทุก role เห็นได้ แต่ User/Guest ไม่เห็น VIN
+// GET /api/products
+// ทุกคนดูได้ (ไม่ต้อง login)
+// RBAC: admin → เห็น VIN | user/guest → VIN ถูกซ่อน (vin: null)
 app.get('/api/products', optionalAuth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM used_car_inventory ORDER BY updated_at DESC');
 
-    // ถ้า role เป็น admin ให้เห็น VIN, อื่นๆ ซ่อน VIN
     const isAdmin = req.user && req.user.role === 'admin';
     const data = rows.map((row) => {
       if (!isAdmin) {
+        // ซ่อน VIN สำหรับ user ทั่วไปและ guest
         const { vin, ...rest } = row;
         return { ...rest, vin: null };
       }
@@ -241,7 +296,9 @@ app.get('/api/products', optionalAuth, async (req, res) => {
   }
 });
 
-// POST /api/products — Admin only
+// POST /api/products — เพิ่มรถใหม่
+// ต้อง login + เป็น admin เท่านั้น
+// รับ: ข้อมูลรถทุก field (ดู Car interface ใน InventoryContext.tsx)
 app.post('/api/products', authToken, requireAdmin, async (req, res) => {
   try {
     const {
@@ -279,9 +336,9 @@ app.post('/api/products', authToken, requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/products/:id
-// Admin: แก้ไขได้ทุก field
-// User: แก้ได้เฉพาะ status='Sold', selling_price, sold_date (สำหรับการซื้อ)
+// PATCH /api/products/:id — แก้ไขข้อมูลรถ
+// admin: แก้ไขได้ทุก field
+// user:  แก้ได้เฉพาะ status='Sold', selling_price, sold_date (สำหรับการซื้อ)
 app.patch('/api/products/:id', authToken, async (req, res) => {
   const carId = req.params.id;
   const updates = req.body;
@@ -290,7 +347,7 @@ app.patch('/api/products/:id', authToken, async (req, res) => {
     return res.status(400).json({ error: 'No fields to update' });
   }
 
-  // ถ้า user role ให้ทำได้แค่ซื้อ (เปลี่ยน status เป็น Sold เท่านั้น)
+  // จำกัดสิทธิ์ user role — ทำได้แค่ขาย (mark as Sold)
   if (req.user.role === 'user') {
     const allowedKeys = ['status', 'selling_price', 'sold_date'];
     const requestedKeys = Object.keys(updates);
@@ -306,6 +363,7 @@ app.patch('/api/products/:id', authToken, async (req, res) => {
     const values = [];
 
     for (const [key, value] of Object.entries(updates)) {
+      // ข้าม field ที่ไม่ควร update โดยตรง
       if (key === 'car_id' || key === 'id' || key === 'created_at' || key === 'updated_at') continue;
       fields.push(`${key} = ?`);
       values.push(value);
@@ -326,7 +384,8 @@ app.patch('/api/products/:id', authToken, async (req, res) => {
   }
 });
 
-// DELETE /api/products/:id — Admin only
+// DELETE /api/products/:id — ลบรถ
+// ต้อง login + เป็น admin เท่านั้น
 app.delete('/api/products/:id', authToken, requireAdmin, async (req, res) => {
   const carId = req.params.id;
   try {
@@ -341,11 +400,131 @@ app.delete('/api/products/:id', authToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Basic health check
+// ═══════════════════════════════════════════════════════════
+// ORDERS ENDPOINTS
+// เชื่อมต่อกับ: src/app/orders.tsx และ src/context/InventoryContext.tsx
+// ตาราง DB: orders
+// ═══════════════════════════════════════════════════════════
+
+// POST /api/orders — สร้างคำสั่งซื้อใหม่
+// ต้อง login (user หรือ admin)
+// รับ: { car_id, buyer_name, buyer_phone, buyer_address, delivery_type }
+// ผล: สร้าง order + เปลี่ยนสถานะรถเป็น 'Reserved'
+app.post('/api/orders', authToken, async (req, res) => {
+  try {
+    const { car_id, buyer_name, buyer_phone, buyer_address, delivery_type } = req.body;
+
+    if (!car_id || !buyer_name || !buyer_phone || !buyer_address || !delivery_type) {
+      return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+    }
+    if (!['pickup', 'delivery'].includes(delivery_type)) {
+      return res.status(400).json({ error: 'delivery_type ต้องเป็น pickup หรือ delivery' });
+    }
+
+    // ตรวจสอบว่ารถมีอยู่และยังว่างอยู่
+    const [cars] = await pool.query('SELECT * FROM used_car_inventory WHERE car_id = ?', [car_id]);
+    if (cars.length === 0) {
+      return res.status(404).json({ error: 'ไม่พบรถคันนี้' });
+    }
+    if (cars[0].status !== 'Available') {
+      return res.status(409).json({ error: 'รถคันนี้ไม่สามารถสั่งซื้อได้ในขณะนี้' });
+    }
+
+    // สร้าง order
+    const [result] = await pool.query(
+      'INSERT INTO orders (car_id, user_id, buyer_name, buyer_phone, buyer_address, delivery_type) VALUES (?, ?, ?, ?, ?, ?)',
+      [car_id, req.user.id, buyer_name.trim(), buyer_phone.trim(), buyer_address.trim(), delivery_type]
+    );
+
+    // เปลี่ยนสถานะรถเป็น Reserved (รอ admin อนุมัติ)
+    await pool.query('UPDATE used_car_inventory SET status = ? WHERE car_id = ?', ['Reserved', car_id]);
+
+    res.status(201).json({
+      message: 'ส่งคำสั่งซื้อสำเร็จ รอการอนุมัติจาก Admin',
+      order_id: result.insertId
+    });
+  } catch (e) {
+    console.error('Create Order Error:', e.message);
+    res.status(500).json({ error: 'ไม่สามารถสร้างคำสั่งซื้อได้' });
+  }
+});
+
+// GET /api/orders — ดูคำสั่งซื้อทั้งหมด
+// Admin only — เห็นทุก order พร้อมข้อมูลรถและผู้ซื้อ
+app.get('/api/orders', authToken, requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        o.*,
+        c.brand, c.model, c.model_year, c.selling_price,
+        c.license_plate, c.image_emoji, c.image_url,
+        u.username as buyer_username
+      FROM orders o
+      LEFT JOIN used_car_inventory c ON o.car_id = c.car_id
+      LEFT JOIN users u ON o.user_id = u.id
+      ORDER BY o.created_at DESC
+    `);
+    res.json(rows);
+  } catch (e) {
+    console.error('Get Orders Error:', e.message);
+    res.status(500).json({ error: 'ไม่สามารถโหลดคำสั่งซื้อได้' });
+  }
+});
+
+// PATCH /api/orders/:id — อนุมัติหรือปฏิเสธคำสั่งซื้อ
+// Admin only
+// รับ: { status: 'approved'|'rejected', admin_note? }
+// ถ้า approved → รถเปลี่ยนเป็น Sold
+// ถ้า rejected → รถกลับเป็น Available
+app.patch('/api/orders/:id', authToken, requireAdmin, async (req, res) => {
+  const orderId = req.params.id;
+  const { status, admin_note } = req.body;
+
+  if (!['approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'status ต้องเป็น approved หรือ rejected' });
+  }
+
+  try {
+    // ดึงข้อมูล order
+    const [orders] = await pool.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+    const order = orders[0];
+    if (order.status !== 'pending') {
+      return res.status(409).json({ error: 'คำสั่งซื้อนี้ถูกดำเนินการแล้ว' });
+    }
+
+    // อัปเดตสถานะ order
+    await pool.query(
+      'UPDATE orders SET status = ?, admin_note = ? WHERE id = ?',
+      [status, admin_note || null, orderId]
+    );
+
+    // อัปเดตสถานะรถตาม decision
+    const carStatus = status === 'approved' ? 'Sold' : 'Available';
+    const soldDate = status === 'approved' ? new Date().toISOString().split('T')[0] : null;
+    await pool.query(
+      'UPDATE used_car_inventory SET status = ?, sold_date = ? WHERE car_id = ?',
+      [carStatus, soldDate, order.car_id]
+    );
+
+    res.json({
+      message: status === 'approved' ? 'อนุมัติคำสั่งซื้อแล้ว' : 'ปฏิเสธคำสั่งซื้อแล้ว',
+      status
+    });
+  } catch (e) {
+    console.error('Update Order Error:', e.message);
+    res.status(500).json({ error: 'ไม่สามารถอัปเดตคำสั่งซื้อได้' });
+  }
+});
+
+// GET /api — Health check ตรวจสอบว่า server ทำงานอยู่
 app.get('/api', (req, res) => {
   res.send('API is running');
 });
 
+// เริ่ม server รับ request จากทุก interface (0.0.0.0)
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 API running on port ${port}`);
 });

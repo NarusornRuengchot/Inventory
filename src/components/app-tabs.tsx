@@ -48,6 +48,17 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+
+      {/* Tab Orders — Admin only */}
+      {isAdmin && (
+        <NativeTabs.Trigger name="orders">
+          <NativeTabs.Trigger.Label>Orders</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            src={require('@/assets/images/tabIcons/products.png')}
+            renderingMode="template"
+          />
+        </NativeTabs.Trigger>
+      )}
     </NativeTabs>
   );
 }

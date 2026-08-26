@@ -65,12 +65,21 @@ export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { cars, sellCar, deleteCar, updateCar, loading } = useInventory();
-  const { isAdmin } = useAuth();
+  const { cars, sellCar, deleteCar, updateCar, createOrder, loading } = useInventory();
+  const { isAdmin, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | Car['status']>('All');
 
-  // State for Sell Modal
+  // ─── State for Purchase Form Modal (User สั่งซื้อ) ───
+  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
+  const [purchaseCar, setPurchaseCar] = useState<Car | null>(null);
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerPhone, setBuyerPhone] = useState('');
+  const [buyerAddress, setBuyerAddress] = useState('');
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+
+  // ─── State for old Sell Modal (Admin ขายตรง — ยังใช้อยู่) ───
   const [sellModalVisible, setSellModalVisible] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [sellPriceInput, setSellPriceInput] = useState('');
@@ -186,6 +195,50 @@ export default function ProductsScreen() {
     setEditModalVisible(false);
     setEditingCar(null);
     customAlert('Success', 'Car details updated successfully.');
+  };
+
+  // ─── handleOpenPurchaseModal — เปิด form สั่งซื้อ (User) ───
+  const handleOpenPurchaseModal = (car: Car) => {
+    setDetailModalVisible(false);
+    setPurchaseCar(car);
+    setBuyerName('');
+    setBuyerPhone('');
+    setBuyerAddress('');
+    setDeliveryType('pickup');
+    setPurchaseModalVisible(true);
+  };
+
+  // ─── handleConfirmPurchase ───
+  const handleConfirmPurchase = async () => {
+    if (!purchaseCar || !user) return;
+    if (!buyerName.trim() || !buyerPhone.trim() || !buyerAddress.trim()) {
+      customAlert('Incomplete Information', 'Please fill in your name, phone number, and address.');
+      return;
+    }
+    if (!/^[0-9\-+\s]{9,15}$/.test(buyerPhone.trim())) {
+      customAlert('Invalid Phone Number', 'Please enter a valid phone number.');
+      return;
+    }
+    setPurchaseLoading(true);
+    try {
+      await createOrder({
+        car_id: purchaseCar.car_id,
+        buyer_name: buyerName.trim(),
+        buyer_phone: buyerPhone.trim(),
+        buyer_address: buyerAddress.trim(),
+        delivery_type: deliveryType,
+      });
+      setPurchaseModalVisible(false);
+      setPurchaseCar(null);
+      customAlert(
+        'Order Placed!',
+        `Your purchase order for ${purchaseCar.brand} ${purchaseCar.model} has been submitted to Admin for approval.`
+      );
+    } catch (e: any) {
+      customAlert('Error', e.message || 'Failed to place order.');
+    } finally {
+      setPurchaseLoading(false);
+    }
   };
 
   const handleOpenSellModal = (car: Car) => {
@@ -403,7 +456,18 @@ export default function ProductsScreen() {
                         </TouchableOpacity>
                       )}
 
-                      {product.badge_status !== 'Sold' && (
+                      {/* ปุ่ม ✀ สั่งซื้อ (User) — สร้าง Order */}
+                      {product.badge_status === 'Available' && !isAdmin && user && (
+                        <TouchableOpacity
+                          style={[styles.quickActionBtn, styles.sellBtn]}
+                          onPress={() => handleOpenPurchaseModal(product.originalCar)}
+                        >
+                          <Text style={styles.quickActionText}>🛍</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {/* ปุ่ม Admin Sell (Admin) — ขายตรงไม่ผ่าน Order */}
+                      {product.badge_status !== 'Sold' && isAdmin && (
                         <TouchableOpacity
                           style={[styles.quickActionBtn, styles.sellBtn]}
                           onPress={() => handleOpenSellModal(product.originalCar)}
@@ -521,7 +585,28 @@ export default function ProductsScreen() {
                       </TouchableOpacity>
                     )}
 
-                    {detailCar.status !== 'Sold' && (
+                    {/* Order Button — User (Logged In) */}
+                    {detailCar.status === 'Available' && !isAdmin && user && (
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, { backgroundColor: '#10B981' }]}
+                        onPress={() => handleOpenPurchaseModal(detailCar)}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>🛍 Buy Now</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Order Button — Not Logged In */}
+                    {detailCar.status === 'Available' && !isAdmin && !user && (
+                      <TouchableOpacity
+                        style={[styles.detailActionBtn, { backgroundColor: '#6B7280' }]}
+                        onPress={() => customAlert('Login Required', 'Please login before placing a purchase order.')}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>🔑 Login to Buy</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* ปุ่ม Admin Sell — Admin ขายตรงไม่ผ่าน Order */}
+                    {detailCar.status !== 'Sold' && isAdmin && (
                       <TouchableOpacity
                         style={[styles.detailActionBtn, { backgroundColor: '#10B981' }]}
                         onPress={() => handleOpenSellModal(detailCar)}
@@ -548,7 +633,136 @@ export default function ProductsScreen() {
       </Modal>
 
 
-      {/* ─── SELL MODAL ─── */}
+      {/* ─── PURCHASE FORM MODAL (User Purchase) ─── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={purchaseModalVisible}
+        onRequestClose={() => setPurchaseModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.modalContentLarge, { backgroundColor: theme.modalBg }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#333' }]}>🛍 Buyer Information</Text>
+            {purchaseCar && (
+              <Text style={[styles.modalCarName, { color: isDark ? '#b0b4ba' : '#666' }]}>
+                {purchaseCar.model_year} {purchaseCar.brand} {purchaseCar.model} • ฿{Number(purchaseCar.selling_price).toLocaleString('th-TH')}
+              </Text>
+            )}
+
+            <ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 8 }}>
+              {/* Buyer Name */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>👤 Full Name *</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: theme.inputBorder,
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: theme.inputFieldBg
+                  }]}
+                  value={buyerName}
+                  onChangeText={setBuyerName}
+                  placeholder="First and Last Name"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              {/* Phone */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>📱 Phone Number *</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: theme.inputBorder,
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: theme.inputFieldBg
+                  }]}
+                  value={buyerPhone}
+                  onChangeText={setBuyerPhone}
+                  placeholder="0XX-XXX-XXXX"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              {/* Address */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>🏠 Delivery / Contact Address *</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    borderColor: theme.inputBorder,
+                    color: isDark ? '#fff' : '#000',
+                    backgroundColor: theme.inputFieldBg,
+                    minHeight: 72,
+                    textAlignVertical: 'top',
+                  }]}
+                  value={buyerAddress}
+                  onChangeText={setBuyerAddress}
+                  placeholder="House number, Street, District, Province, Postal Code"
+                  placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              {/* Delivery Option */}
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>🚗 Delivery Method *</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.deliveryOptionBtn,
+                      deliveryType === 'pickup' && styles.deliveryOptionBtnActive,
+                      { borderColor: deliveryType === 'pickup' ? '#8B5CF6' : (isDark ? '#444' : '#ddd') }
+                    ]}
+                    onPress={() => setDeliveryType('pickup')}
+                  >
+                    <Text style={{ fontSize: 22 }}>🏛</Text>
+                    <Text style={[
+                      styles.deliveryOptionText,
+                      { color: deliveryType === 'pickup' ? '#8B5CF6' : (isDark ? '#aaa' : '#666') }
+                    ]}>Pickup at Office</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.deliveryOptionBtn,
+                      deliveryType === 'delivery' && styles.deliveryOptionBtnActive,
+                      { borderColor: deliveryType === 'delivery' ? '#8B5CF6' : (isDark ? '#444' : '#ddd') }
+                    ]}
+                    onPress={() => setDeliveryType('delivery')}
+                  >
+                    <Text style={{ fontSize: 22 }}>🚚</Text>
+                    <Text style={[
+                      styles.deliveryOptionText,
+                      { color: deliveryType === 'delivery' ? '#8B5CF6' : (isDark ? '#aaa' : '#666') }
+                    ]}>Home Delivery</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalButtons, { marginTop: 16 }]}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: isDark ? '#2e3135' : '#f0f0f0' }]}
+                onPress={() => setPurchaseModalVisible(false)}
+                disabled={purchaseLoading}
+              >
+                <Text style={[styles.modalBtnText, { color: isDark ? '#fff' : '#333' }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm, { opacity: purchaseLoading ? 0.7 : 1 }]}
+                onPress={handleConfirmPurchase}
+                disabled={purchaseLoading}
+              >
+                <Text style={[styles.modalBtnText, { color: '#fff' }]}>
+                  {purchaseLoading ? 'Submitting...' : '✓ Place Order'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── SELL MODAL (Admin ขายตรง) ─── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -723,8 +937,9 @@ export default function ProductsScreen() {
                     style={[styles.modalInput, { borderColor: theme.inputBorder, color: isDark ? '#fff' : '#000', backgroundColor: theme.inputFieldBg }]}
                     value={editLicensePlate}
                     onChangeText={setEditLicensePlate}
-                    placeholder="กข-1234"
+                    placeholder="ABC-1234"
                     placeholderTextColor={isDark ? '#8a8e94' : '#999'}
+                    autoCapitalize="characters"
                   />
                 </View>
               </View>
@@ -1387,6 +1602,24 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  // ─── Delivery Option Buttons (Purchase Modal) ───
+  deliveryOptionBtn: {
+    flex: 1,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'transparent',
+  },
+  deliveryOptionBtnActive: {
+    backgroundColor: 'rgba(139,92,246,0.1)',
+  },
+  deliveryOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 
