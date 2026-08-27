@@ -30,9 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env
-.env*.local
+# local env files (Uncommented so censored .env is uploaded to GitHub)
+# .env
+# .env*.local
 
 
 # typescript
