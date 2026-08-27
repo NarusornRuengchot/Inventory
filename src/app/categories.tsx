@@ -1,21 +1,20 @@
-import React from 'react';
+import { TopNavigation } from '@/components/top-navigation';
+import { useInventory } from '@/context/InventoryContext';
 import {
+  Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
   useColorScheme,
-  Platform,
+  View,
 } from 'react-native';
-import { useInventory } from '@/context/InventoryContext';
-import { TopNavigation } from '@/components/top-navigation';
 
 export default function CategoriesScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
   const { cars } = useInventory();
 
   // Group by Brand
@@ -60,14 +59,14 @@ export default function CategoriesScreen() {
   return (
     <SafeAreaView style={[styles.container, themeStyles.container]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f8f9fa'} />
-      
+
       {/* Header */}
       {Platform.OS !== 'web' && <TopNavigation activeTab="categories" />}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Section: By Brand */}
         <Text style={[styles.sectionTitle, { color: themeStyles.text }]}>Brands Overview</Text>
-        
+
         <View style={styles.grid}>
           {Object.entries(brandStats).map(([brand, stat]) => (
             <View key={brand} style={[styles.card, themeStyles.cardBg, themeStyles.border]}>
@@ -77,7 +76,7 @@ export default function CategoriesScreen() {
                 </View>
                 <Text style={[styles.brandName, { color: themeStyles.text }]} numberOfLines={1}>{brand}</Text>
               </View>
-              
+
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Text style={styles.statLabel}>Total</Text>
@@ -103,7 +102,7 @@ export default function CategoriesScreen() {
 
         {/* Section: Fuel Types */}
         <Text style={[styles.sectionTitle, { color: themeStyles.text, marginTop: 24 }]}>Fuel Types</Text>
-        
+
         <View style={styles.typeList}>
           {Object.entries(fuelStats).map(([type, stat]) => {
             const progress = stat.count > 0 ? (stat.available / stat.count) * 100 : 0;
@@ -157,6 +156,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
   sectionTitle: {
     fontSize: 18,

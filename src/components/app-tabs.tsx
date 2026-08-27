@@ -22,7 +22,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* Tab Add — แสดงเฉพาะ Admin */}
+      {/* Add tab - Admin only */}
       {isAdmin && (
         <NativeTabs.Trigger name="add">
           <NativeTabs.Trigger.Label>Add</NativeTabs.Trigger.Label>
@@ -49,7 +49,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* Tab Orders — ผู้ใช้งานที่ล็อกอินแล้วทุกคน */}
+      {/* Orders tab - Logged-in users */}
       {user && (
         <NativeTabs.Trigger name="orders">
           <NativeTabs.Trigger.Label>{isAdmin ? 'Orders' : 'My Orders'}</NativeTabs.Trigger.Label>

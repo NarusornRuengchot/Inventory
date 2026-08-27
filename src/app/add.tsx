@@ -40,8 +40,9 @@ export default function AddScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { addCar } = useInventory();
+  const { addCar, uploadImage } = useInventory();
   const { isAdmin } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
 
   // Guard: User role ไม่สามารถเข้าหน้านี้ได้
   useEffect(() => {
@@ -64,9 +65,43 @@ export default function AddScreen() {
   const [sellingPrice, setSellingPrice] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🚗');
+  const [imageEmoji, setImageEmoji] = useState('🚗');
   const [imageUrl, setImageUrl] = useState('');
   const [imageUrlError, setImageUrlError] = useState(false);
+  const [selectedEmoji, setSelectedEmoji] = useState('🚗');
+
+  const handlePickFile = () => {
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        setIsUploading(true);
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const base64 = reader.result as string;
+              const uploadedUrl = await uploadImage(base64);
+              setImageUrl(uploadedUrl);
+              setImageUrlError(false);
+            } catch (err: any) {
+              customAlert('Upload Error', err.message || 'Failed to upload image');
+            } finally {
+              setIsUploading(false);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          customAlert('Upload Error', err.message || 'Failed to read file');
+          setIsUploading(false);
+        }
+      };
+      input.click();
+    }
+  };
 
   // Auto-map emoji when brand changes
   const handleBrandChange = (text: string) => {
@@ -205,13 +240,33 @@ export default function AddScreen() {
         <View style={[styles.formContainer, themeStyles.cardBg, themeStyles.border]}>
           <Text style={[styles.formTitle, { color: isDark ? '#fff' : '#111' }]}>🚘 Add Vehicle to Stock</Text>
 
-          {/* ─── IMAGE URL SECTION ─── */}
+          {/* Image URL Section */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>📸 Vehicle Photo</Text>
           </View>
 
+          {/* File Upload Button */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Image URL (optional)</Text>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Upload Photo from Device</Text>
+            <TouchableOpacity
+              style={[
+                styles.uploadBtn,
+                { backgroundColor: isDark ? '#1F2430' : '#EDE9FE', borderColor: '#8B5CF6' },
+                isUploading && { opacity: 0.6 }
+              ]}
+              onPress={handlePickFile}
+              disabled={isUploading}
+            >
+              <Text style={{ fontSize: 20 }}>{isUploading ? '⏳' : '📁'}</Text>
+              <Text style={[styles.uploadBtnText, { color: '#8B5CF6' }]}>
+                {isUploading ? 'Uploading Image to Server...' : 'Choose Image File / Browse'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Or Paste Direct Image URL */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeStyles.labelColor }]}>Or Paste Image URL</Text>
             <TextInput
               style={[
                 inputStyle,
@@ -268,7 +323,7 @@ export default function AddScreen() {
             </View>
           )}
 
-          {/* ─── VEHICLE INFO ─── */}
+          {/* Vehicle Info */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>🚗 Vehicle Info</Text>
           </View>
@@ -352,7 +407,7 @@ export default function AddScreen() {
             </View>
           </View>
 
-          {/* ─── SPECS ─── */}
+          {/* Specs */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>⚙️ Specifications</Text>
           </View>
@@ -429,7 +484,7 @@ export default function AddScreen() {
             </View>
           </View>
 
-          {/* ─── PRICING ─── */}
+          {/* Pricing */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: isDark ? '#8B5CF6' : '#7C3AED' }]}>💰 Pricing</Text>
           </View>
@@ -508,6 +563,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 3,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
   },
   lightCard: {
     backgroundColor: 'white',
@@ -660,6 +718,21 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: 'white',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    paddingHorizontal: 16,
+  },
+  uploadBtnText: {
+    fontSize: 14,
     fontWeight: '700',
   },
 });

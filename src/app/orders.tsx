@@ -1,12 +1,3 @@
-// ============================================================
-// orders.tsx — Admin Orders Management Screen
-// ============================================================
-// Admin-only access — Displays purchase orders submitted by users.
-// Allows admin to Approve (car → Sold) or Reject (car → Available)
-// Endpoints: GET   /api/orders      → Fetch all orders
-//            PATCH /api/orders/:id  → Approve or Reject
-// ============================================================
-
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -458,6 +449,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 4,
     borderBottomWidth: 1,
+    maxWidth: 900,
+    width: '100%',
+    alignSelf: 'center',
   },
   filterTab: {
     flex: 1,
@@ -469,7 +463,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139,92,246,0.12)',
   },
   filterTabText: { fontSize: 11, fontWeight: '700' },
-  scrollContent: { padding: 16, gap: 14 },
+  scrollContent: {
+    padding: 16,
+    gap: 14,
+    maxWidth: 900,
+    width: '100%',
+    alignSelf: 'center',
+  },
   emptyState: { flex: 1, alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 16, fontWeight: '600' },
   // Order Card

@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { Car, useInventory } from '@/context/InventoryContext';
+import { customAlert } from '@/utils/alert';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Modal,
   SafeAreaView,
@@ -12,18 +16,9 @@ import {
   TextInput,
   TouchableOpacity,
   useColorScheme,
+  useWindowDimensions,
   View
 } from 'react-native';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { Car, useInventory } from '@/context/InventoryContext';
-import { customAlert } from '@/utils/alert';
-import { useAuth } from '@/context/AuthContext';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_MARGIN = 8;
-const NUM_COLUMNS = 2;
-const CARD_WIDTH = (SCREEN_WIDTH - 32 - CARD_MARGIN * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
 interface Product {
   id: string;
@@ -64,13 +59,21 @@ export default function ProductsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 1200 ? 4 : width >= 850 ? 3 : 2;
+  // Explicit card width so all cells are identical (fixes FlatList last-row stretch)
+  const CARD_MARGIN = 5;
+  const CONTENT_PADDING = 16;
+  const containerWidth = Math.min(width, 1200);
+  const cardWidth = (containerWidth - CONTENT_PADDING * 2 - numColumns * CARD_MARGIN * 2) / numColumns;
 
-  const { cars, sellCar, deleteCar, updateCar, createOrder, loading } = useInventory();
+  const { cars, sellCar, deleteCar, updateCar, createOrder, uploadImage, loading } = useInventory();
   const { isAdmin, user } = useAuth();
+  const [isEditUploading, setIsEditUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | Car['status']>('All');
 
-  // ─── State for Purchase Form Modal (User สั่งซื้อ) ───
+  // Purchase Modal state
   const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [purchaseCar, setPurchaseCar] = useState<Car | null>(null);
   const [buyerName, setBuyerName] = useState('');
@@ -79,7 +82,7 @@ export default function ProductsScreen() {
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
   const [purchaseLoading, setPurchaseLoading] = useState(false);
 
-  // ─── State for old Sell Modal (Admin ขายตรง — ยังใช้อยู่) ───
+  // Sell Modal state (Admin direct sell)
   const [sellModalVisible, setSellModalVisible] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [sellPriceInput, setSellPriceInput] = useState('');
@@ -131,6 +134,40 @@ export default function ProductsScreen() {
     setDetailModalVisible(true);
   };
 
+  const handlePickEditFile = () => {
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        setIsEditUploading(true);
+        try {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const base64 = reader.result as string;
+              const uploadedUrl = await uploadImage(base64);
+              setEditImageUrl(uploadedUrl);
+              setEditImageUrlError(false);
+            } catch (err: any) {
+              customAlert('Upload Error', err.message || 'Failed to upload image');
+            } finally {
+              setIsEditUploading(false);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err: any) {
+          customAlert('Upload Error', err.message || 'Failed to read file');
+          setIsEditUploading(false);
+        }
+      };
+      input.click();
+    }
+  };
+
+  // [SEARCH: UI-EDIT-CAR] ฟังก์ชันเปิดหน้าต่างแก้ไขข้อมูลรถ (Modal)
   const handleOpenEditModal = (car: Car) => {
     setDetailModalVisible(false);
     setEditingCar(car);
@@ -152,6 +189,7 @@ export default function ProductsScreen() {
     setEditModalVisible(true);
   };
 
+  // [SEARCH: UI-EDIT-CONFIRM] ฟังก์ชันกดยืนยันบันทึกการแก้ไขข้อมูลรถ (เรียก updateCar)
   const handleConfirmEdit = () => {
     if (!editingCar) return;
     const yearVal = parseInt(editModelYear);
@@ -197,7 +235,7 @@ export default function ProductsScreen() {
     customAlert('Success', 'Car details updated successfully.');
   };
 
-  // ─── handleOpenPurchaseModal — เปิด form สั่งซื้อ (User) ───
+  // [SEARCH: UI-BUY-CAR] ฟังก์ชันเปิดหน้าต่างสั่งซื้อรถ (สำหรับ User)
   const handleOpenPurchaseModal = (car: Car) => {
     setDetailModalVisible(false);
     setPurchaseCar(car);
@@ -208,7 +246,7 @@ export default function ProductsScreen() {
     setPurchaseModalVisible(true);
   };
 
-  // ─── handleConfirmPurchase ───
+  // [SEARCH: UI-BUY-CONFIRM] ฟังก์ชันกดยืนยันการสั่งซื้อรถ (เรียก createOrder)
   const handleConfirmPurchase = async () => {
     if (!purchaseCar || !user) return;
     if (!buyerName.trim() || !buyerPhone.trim() || !buyerAddress.trim()) {
@@ -241,6 +279,7 @@ export default function ProductsScreen() {
     }
   };
 
+  // [SEARCH: UI-SELL-CAR] ฟังก์ชันเปิดหน้าต่างขายรถโดยตรง (สำหรับ Admin)
   const handleOpenSellModal = (car: Car) => {
     setDetailModalVisible(false);
     setSelectedCar(car);
@@ -248,6 +287,7 @@ export default function ProductsScreen() {
     setSellModalVisible(true);
   };
 
+  // [SEARCH: UI-SELL-CONFIRM] ฟังก์ชันกดยืนยันการขายรถ (เรียก sellCar)
   const handleConfirmSell = () => {
     if (!selectedCar) return;
     const price = parseFloat(sellPriceInput);
@@ -262,6 +302,7 @@ export default function ProductsScreen() {
     customAlert('Car Sold!', `${selectedCar.brand} ${selectedCar.model} sold for ฿${Number(price).toLocaleString('th-TH')}.`);
   };
 
+  // [SEARCH: UI-DELETE-CAR] ฟังก์ชันลบรถออกจากระบบ (เรียก deleteCar)
   const handleDelete = (car: Car) => {
     setDetailModalVisible(false);
     customAlert(
@@ -278,6 +319,7 @@ export default function ProductsScreen() {
     );
   };
 
+  // [SEARCH: UI-ADD-CAR] ปุ่มนำทางไปหน้าเพิ่มรถใหม่ (Add Screen)
   const handleAddProduct = () => {
     router.push('/add');
   };
@@ -323,187 +365,186 @@ export default function ProductsScreen() {
     <SafeAreaView style={[styles.container, theme.container]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
 
-      {/* Header */}
-      <View style={[styles.header, theme.border, { backgroundColor: theme.headerBg }]}>
-        <TouchableOpacity style={styles.headerButton}>
-          <Text style={[styles.headerIcon, { color: theme.text.color }]}>☰</Text>
-        </TouchableOpacity>
-
-        <Text style={[styles.headerTitle, { color: theme.text.color }]}>Car Inventory</Text>
-
-        <TouchableOpacity style={styles.profileButton}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Action Bar */}
-      <View style={styles.actionBarContainer}>
-        <View style={[styles.searchBar, { backgroundColor: theme.inputBg }]}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={[styles.searchInput, { color: theme.inputText }]}
-            placeholder="Search brand, vin, plate..."
-            placeholderTextColor={isDark ? '#8A8E94' : '#999999'}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearch}>
-              <Text style={{ color: isDark ? '#8A8E94' : '#999999', fontWeight: 'bold' }}>×</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {/* Add Car button — Admin only */}
-        {isAdmin && (
-          <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
-            <Text style={styles.addProductText}>+ Add Car</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            statusFilter !== 'All' && styles.filterButtonActive,
-            { backgroundColor: statusFilter !== 'All' ? '#8B5CF6' : theme.inputBg }
-          ]}
-          onPress={toggleFilter}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            { color: statusFilter !== 'All' ? '#FFFFFF' : theme.text.color }
-          ]}>
-            Filter{statusFilter !== 'All' ? `: ${statusFilter}` : ''} ▽
+      <View style={styles.mainContentWrapper}>
+        {/* Page Title & Action Bar */}
+        <View style={styles.topHeaderSection}>
+          <Text style={[styles.pageTitleText, { color: theme.text.color }]}>Car Inventory</Text>
+          <Text style={[styles.pageSubText, theme.textSecondary]}>
+            {filteredProducts.length} vehicle{filteredProducts.length !== 1 ? 's' : ''} in stock
           </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Product List */}
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
         </View>
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Text style={[styles.emptyText, theme.textSecondary]}>No cars found 📦</Text>
+
+        {/* Action Bar */}
+        <View style={styles.actionBarContainer}>
+          <View style={[styles.searchBar, { backgroundColor: theme.inputBg }]}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={[styles.searchInput, { color: theme.inputText }]}
+              placeholder="Search brand, vin, plate..."
+              placeholderTextColor={isDark ? '#8A8E94' : '#999999'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearch}>
+                <Text style={{ color: isDark ? '#8A8E94' : '#999999', fontWeight: 'bold' }}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* Add Car button — Admin only */}
+          {isAdmin && (
+            <TouchableOpacity style={styles.addProductButton} onPress={handleAddProduct}>
+              <Text style={styles.addProductText}>+ Add Car</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              statusFilter !== 'All' && styles.filterButtonActive,
+              { backgroundColor: statusFilter !== 'All' ? '#8B5CF6' : theme.inputBg }
+            ]}
+            onPress={toggleFilter}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              { color: statusFilter !== 'All' ? '#FFFFFF' : theme.text.color }
+            ]}>
+              Filter{statusFilter !== 'All' ? `: ${statusFilter}` : ''} ▽
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          keyExtractor={(product) => product.id}
-          numColumns={NUM_COLUMNS}
-          contentContainerStyle={styles.scrollContent}
-          columnWrapperStyle={styles.columnWrapper}
-          renderItem={({ item: product }) => {
-            const badgeColors = getStatusBadgeStyle(product.badge_status);
 
-            return (
-              <TouchableOpacity
-                style={[styles.productCard, theme.cardBg, theme.border]}
-                onPress={() => handleProductPress(product)}
-                activeOpacity={0.88}
-              >
-                {/* Product Image */}
-                <View style={styles.productImageContainer}>
-                  <Image
-                    source={{ uri: product.image_url }}
-                    style={styles.productImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                  {/* Gradient overlay at bottom of image */}
-                  <View style={styles.imageGradient} />
+        {/* Product List */}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#8B5CF6" />
+          </View>
+        ) : filteredProducts.length === 0 ? (
+          <View style={styles.centerContainer}>
+            <Text style={[styles.emptyText, theme.textSecondary]}>No cars found 📦</Text>
+          </View>
+        ) : (
+          <FlatList
+            key={`grid_${numColumns}`}
+            data={filteredProducts}
+            keyExtractor={(product) => product.id}
+            numColumns={numColumns}
+            contentContainerStyle={styles.scrollContent}
+            columnWrapperStyle={styles.columnWrapper}
+            renderItem={({ item: product }) => {
+              const badgeColors = getStatusBadgeStyle(product.badge_status);
 
-                  {/* Status Badge */}
-                  <View style={[styles.statusBadgeOverlay, { backgroundColor: badgeColors.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: badgeColors.text }]}>
-                      {product.badge_status}
-                    </Text>
-                  </View>
+              return (
+                <TouchableOpacity
+                  style={[styles.productCard, theme.cardBg, theme.border, { width: cardWidth }]}
+                  onPress={() => handleProductPress(product)}
+                  activeOpacity={0.88}
+                >
+                  {/* Product Image */}
+                  <View style={styles.productImageContainer}>
+                    <Image
+                      source={{ uri: product.image_url }}
+                      style={styles.productImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                    {/* Gradient overlay at bottom of image */}
+                    <View style={styles.imageGradient} />
 
-                  {/* Price overlaid on image bottom */}
-                  <Text style={styles.priceOverlay}>
-                    ฿{Number(product.originalCar.selling_price).toLocaleString('th-TH')}
-                  </Text>
-                </View>
-
-                {/* Card Content */}
-                <View style={styles.cardContent}>
-                  <Text style={[styles.productName, theme.text]} numberOfLines={2}>
-                    {product.name}
-                  </Text>
-
-                  <View style={styles.cardDetailRow}>
-                    <Text style={[styles.detailChip, theme.textSecondary]}>
-                      ⛽ {product.originalCar.fuel_type}
-                    </Text>
-                    <Text style={[styles.detailChip, theme.textSecondary]}>
-                      ⚙️ {product.originalCar.transmission}
-                    </Text>
-                  </View>
-
-                  {/* Action Row */}
-                  <View style={styles.cardBottom}>
-                    {/* Quick Action Buttons */}
-                    <View style={styles.quickActions}>
-                      {/* Edit — Admin only */}
-                      {isAdmin && (
-                        <TouchableOpacity
-                          style={[styles.quickActionBtn, styles.editBtn]}
-                          onPress={() => handleOpenEditModal(product.originalCar)}
-                        >
-                          <Text style={styles.quickActionText}>✏️</Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {/* ปุ่ม ✀ สั่งซื้อ (User) — สร้าง Order */}
-                      {product.badge_status === 'Available' && !isAdmin && user && (
-                        <TouchableOpacity
-                          style={[styles.quickActionBtn, styles.sellBtn]}
-                          onPress={() => handleOpenPurchaseModal(product.originalCar)}
-                        >
-                          <Text style={styles.quickActionText}>🛍</Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {/* ปุ่ม Admin Sell (Admin) — ขายตรงไม่ผ่าน Order */}
-                      {product.badge_status !== 'Sold' && isAdmin && (
-                        <TouchableOpacity
-                          style={[styles.quickActionBtn, styles.sellBtn]}
-                          onPress={() => handleOpenSellModal(product.originalCar)}
-                        >
-                          <Text style={styles.quickActionText}>💰</Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Delete — Admin only */}
-                      {isAdmin && (
-                        <TouchableOpacity
-                          style={[styles.quickActionBtn, styles.deleteBtn]}
-                          onPress={() => handleDelete(product.originalCar)}
-                        >
-                          <Text style={styles.quickActionText}>🗑️</Text>
-                        </TouchableOpacity>
-                      )}
+                    {/* Status Badge */}
+                    <View style={[styles.statusBadgeOverlay, { backgroundColor: badgeColors.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: badgeColors.text }]}>
+                        {product.badge_status}
+                      </Text>
                     </View>
 
-                    {/* Detail button */}
-                    <TouchableOpacity
-                      style={styles.detailIconBtn}
-                      onPress={() => handleProductPress(product)}
-                    >
-                      <Text style={styles.detailIconText}>👁</Text>
-                    </TouchableOpacity>
+                    {/* Price overlaid on image bottom */}
+                    <Text style={styles.priceOverlay}>
+                      ฿{Number(product.originalCar.selling_price).toLocaleString('th-TH')}
+                    </Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      )}
 
+                  {/* Card Content */}
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.productName, theme.text]} numberOfLines={1}>
+                      {product.name}
+                    </Text>
 
-      {/* ─── DETAIL MODAL ─── */}
+                    <View style={styles.cardDetailRow}>
+                      <Text style={[styles.detailChip, theme.textSecondary]}>
+                        ⛽ {product.originalCar.fuel_type}
+                      </Text>
+                      <Text style={[styles.detailChip, theme.textSecondary]}>
+                        ⚙️ {product.originalCar.transmission}
+                      </Text>
+                    </View>
+
+                    {/* Action Row */}
+                    <View style={styles.cardBottom}>
+                      <Text style={[styles.plateSmall, theme.textSecondary]}>
+                        {product.originalCar.license_plate}
+                      </Text>
+                      <View style={styles.quickActions}>
+                        {/* Detail View */}
+                        <TouchableOpacity
+                          style={styles.detailIconBtn}
+                          onPress={() => handleProductPress(product)}
+                        >
+                          <Text style={styles.detailIconText}>👁️</Text>
+                        </TouchableOpacity>
+
+                        {/* Order (User) */}
+                        {product.originalCar.status === 'Available' && !isAdmin && (
+                          <TouchableOpacity
+                            style={[styles.quickActionBtn, styles.sellBtn]}
+                            onPress={() => user ? handleOpenPurchaseModal(product.originalCar) : customAlert('Login Required', 'Please login to buy.')}
+                          >
+                            <Text style={styles.quickActionText}>🛍</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Edit (Admin) */}
+                        {isAdmin && (
+                          <TouchableOpacity
+                            style={[styles.quickActionBtn, styles.editBtn]}
+                            onPress={() => handleOpenEditModal(product.originalCar)}
+                          >
+                            <Text style={styles.quickActionText}>✏️</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Sell (Admin) */}
+                        {isAdmin && product.originalCar.status !== 'Sold' && (
+                          <TouchableOpacity
+                            style={[styles.quickActionBtn, styles.sellBtn]}
+                            onPress={() => handleOpenSellModal(product.originalCar)}
+                          >
+                            <Text style={styles.quickActionText}>💰</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Delete (Admin) */}
+                        {isAdmin && (
+                          <TouchableOpacity
+                            style={[styles.quickActionBtn, styles.deleteBtn]}
+                            onPress={() => handleDelete(product.originalCar)}
+                          >
+                            <Text style={styles.quickActionText}>🗑️</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
+      </View>
+
+      {/* Detail Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -633,7 +674,7 @@ export default function ProductsScreen() {
       </Modal>
 
 
-      {/* ─── PURCHASE FORM MODAL (User Purchase) ─── */}
+      {/* Purchase Form Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -762,7 +803,7 @@ export default function ProductsScreen() {
         </View>
       </Modal>
 
-      {/* ─── SELL MODAL (Admin ขายตรง) ─── */}
+      {/* Sell Modal (Admin) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -813,7 +854,7 @@ export default function ProductsScreen() {
         </View>
       </Modal>
 
-      {/* ─── EDIT MODAL ─── */}
+      {/* Edit Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -830,8 +871,28 @@ export default function ProductsScreen() {
               <View style={styles.editSection}>
                 <Text style={styles.editSectionTitle}>📸 Photo</Text>
               </View>
+
+              {/* Upload from Device */}
               <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Image URL (optional)</Text>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Upload New Photo from Device</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.uploadBtn,
+                    { backgroundColor: isDark ? '#1F2430' : '#EDE9FE', borderColor: '#8B5CF6' },
+                    isEditUploading && { opacity: 0.6 }
+                  ]}
+                  onPress={handlePickEditFile}
+                  disabled={isEditUploading}
+                >
+                  <Text style={{ fontSize: 18 }}>{isEditUploading ? '⏳' : '📁'}</Text>
+                  <Text style={[styles.uploadBtnText, { color: '#8B5CF6' }]}>
+                    {isEditUploading ? 'Uploading Image to Server...' : 'Choose Image File / Browse'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalInputLabel, { color: isDark ? '#b0b4ba' : '#555' }]}>Or Paste Image URL</Text>
                 <TextInput
                   style={[styles.modalInput, {
                     borderColor: editImageUrlError ? '#EF4444' : theme.inputBorder,
@@ -1120,13 +1181,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingTop: 12,
     paddingBottom: 100,
   },
   columnWrapper: {
-    gap: CARD_MARGIN,
-    marginBottom: CARD_MARGIN,
+    gap: 0,
+    marginBottom: 0,
   },
   header: {
     height: 60,
@@ -1209,24 +1270,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterButtonActive: {
-    backgroundColor: '#8B5CF6',
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
   },
   filterButtonText: {
     fontSize: 13,
     fontWeight: '600',
   },
+  mainContentWrapper: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    flex: 1,
+  },
+  topHeaderSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  pageTitleText: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  pageSubText: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  plateSmall: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
 
   // ── Grid Product Card ──
   productCard: {
-    width: CARD_WIDTH,
-    borderRadius: 18,
+    margin: 5,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   lightCard: {
     backgroundColor: '#FFFFFF',
@@ -1257,7 +1343,8 @@ const styles = StyleSheet.create({
   productImageContainer: {
     position: 'relative',
     width: '100%',
-    height: CARD_WIDTH * 0.72,
+    aspectRatio: 16 / 10,
+    backgroundColor: '#EAEAEA',
   },
   productImage: {
     width: '100%',
@@ -1603,7 +1690,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  // ─── Delivery Option Buttons (Purchase Modal) ───
+  // Delivery Option Buttons (Purchase Modal)
   deliveryOptionBtn: {
     flex: 1,
     borderWidth: 2,
@@ -1620,6 +1707,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    paddingHorizontal: 16,
+  },
+  uploadBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

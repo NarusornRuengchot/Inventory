@@ -256,6 +256,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
   welcomeRow: {
     marginBottom: 20,
@@ -277,13 +280,14 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '48%',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 16,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
+    borderWidth: 1,
   },
   lightCard: {
     backgroundColor: 'white',
@@ -292,15 +296,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#161719',
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   cardEmoji: {
-    fontSize: 18,
+    fontSize: 16,
   },
   statLabel: {
     fontSize: 11,
@@ -311,23 +315,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
   },
   statSub: {
     fontSize: 10,
     color: '#999',
-    marginTop: 4,
+    marginTop: 2,
   },
   shortcutRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 20,
   },
   shortcutBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 24,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
