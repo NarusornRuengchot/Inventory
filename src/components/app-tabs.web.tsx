@@ -40,6 +40,11 @@ export default function AppTabs() {
               <TabButton>Add</TabButton>
             </TabTrigger>
           )}
+          {isAdmin && (
+            <TabTrigger name="clusters" href="/clusters" asChild>
+              <TabButton>🤖 AI Clusters</TabButton>
+            </TabTrigger>
+          )}
           <TabTrigger name="products" href="/products" asChild>
             <TabButton>Products</TabButton>
           </TabTrigger>
@@ -68,6 +73,13 @@ export default function AppTabs() {
               <TabButton>Orders</TabButton>
             </TabTrigger>
           )}
+
+          {!isAdmin && (
+            <TabTrigger name="clusters" href="/clusters" asChild style={{ display: 'none' }}>
+              <TabButton>AI Clusters</TabButton>
+            </TabTrigger>
+          )}
+
         </CustomTabList>
       </TabList>
 
@@ -140,6 +152,17 @@ export function WebFooterNav() {
             </Pressable>
           </Link>
         )}
+
+        {isAdmin && (
+          <Link href="/clusters" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type={getButtonType('/clusters')} style={styles.tabButtonView}>
+                <ThemedText type="small" themeColor={getTextColor('/clusters')}>AI Clusters</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Link>
+        )}
+
 
         <Link href="/products" asChild>
           <Pressable style={({ pressed }) => pressed && styles.pressed}>

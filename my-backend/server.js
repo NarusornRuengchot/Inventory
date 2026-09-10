@@ -242,14 +242,21 @@ app.get('/api/products', optionalAuth, async (req, res) => {
 
     const isAdmin = req.user && req.user.role === 'admin';
     const data = rows.map((row) => {
+      const item = {
+        ...row,
+        id: row.car_id,
+        name: `${row.brand} ${row.model}`,
+        price: Number(row.selling_price),
+        stock: row.status === 'Available' ? 1 : 0,
+      };
       if (!isAdmin) {
-        const { vin, ...rest } = row;
-        return { ...rest, vin: null };
+        return { ...item, vin: null };
       }
-      return row;
+      return item;
     });
 
     res.json(data);
+
   } catch (e) {
     console.error('Products Error:', e.message);
     res.status(500).json({ error: 'Failed to fetch products' });

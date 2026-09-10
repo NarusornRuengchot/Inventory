@@ -5,7 +5,7 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 interface TopNavigationProps {
-  activeTab: 'home' | 'products' | 'add' | 'categories';
+  activeTab: 'home' | 'products' | 'add' | 'categories' | 'clusters';
   rightIcon?: string;
 }
 
@@ -45,13 +45,23 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
             <Text style={styles.profileIcon}>{colorScheme === 'dark' ? '☀️' : '🌙'}</Text>
           </TouchableOpacity>
           {/* Logout button */}
-          <TouchableOpacity
-            id="mobile-logout-button"
-            style={[styles.profileButton, { backgroundColor: '#ef4444' }]}
-            onPress={logout}
-          >
-            <Text style={{ fontSize: 12, color: 'white', fontWeight: '700' }}>OUT</Text>
-          </TouchableOpacity>
+          {user && (
+            <TouchableOpacity
+              id="mobile-logout-button"
+              style={[styles.profileButton, { backgroundColor: '#ef4444' }]}
+              onPress={logout}
+            >
+              <Text style={{ fontSize: 12, color: 'white', fontWeight: '700' }}>OUT</Text>
+            </TouchableOpacity>
+          )}
+          {!user && (
+            <TouchableOpacity
+              style={[styles.profileButton, { backgroundColor: '#8B5CF6' }]}
+              onPress={() => router.push('/login')}
+            >
+              <Text style={styles.profileIcon}>🔑</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       
@@ -77,6 +87,16 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
               Add
             </Text>
             {activeTab === 'add' && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+        )}
+
+        {/* AI Clusters — Admin only */}
+        {isAdmin && (
+          <TouchableOpacity onPress={() => router.push('/clusters')} style={styles.navItem}>
+            <Text style={[styles.navText, activeTab === 'clusters' ? styles.activeText : { color: themeStyles.textSecondary }]}>
+              🤖 AI Clusters
+            </Text>
+            {activeTab === 'clusters' && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
         )}
 

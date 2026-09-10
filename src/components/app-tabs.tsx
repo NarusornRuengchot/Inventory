@@ -33,6 +33,18 @@ export default function AppTabs() {
         </NativeTabs.Trigger>
       )}
 
+      {/* AI Clusters tab - Admin only */}
+      {isAdmin && (
+        <NativeTabs.Trigger name="clusters">
+          <NativeTabs.Trigger.Label>AI Clusters</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            src={require('@/assets/images/tabIcons/categories.png')}
+            renderingMode="template"
+          />
+        </NativeTabs.Trigger>
+      )}
+
+
       <NativeTabs.Trigger name="products">
         <NativeTabs.Trigger.Label>Products</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

@@ -31,8 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files (Uncommented so censored .env is uploaded to GitHub)
-# .env
-# .env*.local
+.env
+.env*.local
 
 
 # typescript
