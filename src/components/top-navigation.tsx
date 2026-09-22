@@ -5,7 +5,7 @@ import { useThemeMode } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 interface TopNavigationProps {
-  activeTab: 'home' | 'products' | 'add' | 'categories' | 'clusters';
+  activeTab: 'home' | 'products' | 'add' | 'categories' | 'clusters' | 'group-clusters';
   rightIcon?: string;
 }
 
@@ -94,9 +94,19 @@ export function TopNavigation({ activeTab, rightIcon = '👤' }: TopNavigationPr
         {isAdmin && (
           <TouchableOpacity onPress={() => router.push('/clusters')} style={styles.navItem}>
             <Text style={[styles.navText, activeTab === 'clusters' ? styles.activeText : { color: themeStyles.textSecondary }]}>
-              🤖 AI Clusters
+              🤖 AI
             </Text>
             {activeTab === 'clusters' && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+        )}
+
+        {/* Group Clusters — Admin only */}
+        {isAdmin && (
+          <TouchableOpacity onPress={() => router.push('/group-clusters')} style={styles.navItem}>
+            <Text style={[styles.navText, activeTab === 'group-clusters' ? styles.activeText : { color: themeStyles.textSecondary }]}>
+              👥 Group
+            </Text>
+            {activeTab === 'group-clusters' && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
         )}
 

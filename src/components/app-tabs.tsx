@@ -44,6 +44,17 @@ export default function AppTabs() {
         </NativeTabs.Trigger>
       )}
 
+      {/* Group Clusters tab - Admin only */}
+      {isAdmin && (
+        <NativeTabs.Trigger name="group-clusters">
+          <NativeTabs.Trigger.Label>Group</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            src={require('@/assets/images/tabIcons/categories.png')}
+            renderingMode="template"
+          />
+        </NativeTabs.Trigger>
+      )}
+
 
       <NativeTabs.Trigger name="products">
         <NativeTabs.Trigger.Label>Products</NativeTabs.Trigger.Label>

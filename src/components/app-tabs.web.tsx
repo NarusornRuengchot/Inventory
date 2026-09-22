@@ -45,6 +45,11 @@ export default function AppTabs() {
               <TabButton>🤖 AI Clusters</TabButton>
             </TabTrigger>
           )}
+          {isAdmin && (
+            <TabTrigger name="group-clusters" href="/group-clusters" asChild>
+              <TabButton>👥 Group Clusters</TabButton>
+            </TabTrigger>
+          )}
           <TabTrigger name="products" href="/products" asChild>
             <TabButton>Products</TabButton>
           </TabTrigger>
@@ -77,6 +82,12 @@ export default function AppTabs() {
           {!isAdmin && (
             <TabTrigger name="clusters" href="/clusters" asChild style={{ display: 'none' }}>
               <TabButton>AI Clusters</TabButton>
+            </TabTrigger>
+          )}
+
+          {!isAdmin && (
+            <TabTrigger name="group-clusters" href="/group-clusters" asChild style={{ display: 'none' }}>
+              <TabButton>Group Clusters</TabButton>
             </TabTrigger>
           )}
 
@@ -158,6 +169,16 @@ export function WebFooterNav() {
             <Pressable style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type={getButtonType('/clusters')} style={styles.tabButtonView}>
                 <ThemedText type="small" themeColor={getTextColor('/clusters')}>AI Clusters</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link href="/group-clusters" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type={getButtonType('/group-clusters')} style={styles.tabButtonView}>
+                <ThemedText type="small" themeColor={getTextColor('/group-clusters')}>👥 Group</ThemedText>
               </ThemedView>
             </Pressable>
           </Link>
